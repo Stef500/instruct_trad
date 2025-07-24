@@ -1,8 +1,13 @@
 [project]
-name = "instruct-trad"
+name = "medical-dataset-processor"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automated medical dataset processing with translation and content generation"
 requires-python = ">=3.12"
 dependencies = [
-    "python-dotenv"
+    "python-dotenv",
+    "deepl",
+    "openai",
+    "pyyaml",
+    "reportlab",
+    "datasets"
 ]
