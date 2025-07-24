@@ -1,0 +1,27 @@
+medqa:
+  name: "medqa"
+  source_type: "huggingface"
+  source_path: "bigbio/med_qa"
+  format: "json"
+  text_fields: ["question", "answer"]
+
+pubmedqa:
+  name: "pubmedqa"
+  source_type: "huggingface"
+  source_path: "bigbio/pubmed_qa"
+  format: "json"
+  text_fields: ["question", "context", "final_decision"]
+
+healthsearchqa:
+  name: "healthsearchqa"
+  source_type: "huggingface"
+  source_path: "keivalya/HealthSearchQA"
+  format: "json"
+  text_fields: ["question", "answer"]
+
+mmlu_clinical:
+  name: "mmlu_clinical"
+  source_type: "huggingface"
+  source_path: "cais/mmlu"
+  format: "json"
+  text_fields: ["question", "choices", "answer"]
