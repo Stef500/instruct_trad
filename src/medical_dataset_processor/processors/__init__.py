@@ -4,5 +4,10 @@ Processing components for translation and generation.
 
 from .sample_selector import SampleSelector
 from .translation_processor import TranslationProcessor, TranslationConfig, TranslationError, RateLimitError
+from .generation_processor import GenerationProcessor, GenerationConfig, GenerationError, GenerationRateLimitError
 
-__all__ = ["SampleSelector", "TranslationProcessor", "TranslationConfig", "TranslationError", "RateLimitError"]
+__all__ = [
+    "SampleSelector", 
+    "TranslationProcessor", "TranslationConfig", "TranslationError", "RateLimitError",
+    "GenerationProcessor", "GenerationConfig", "GenerationError", "GenerationRateLimitError"
+]
