@@ -2,6 +2,14 @@
 
 Un système automatisé pour le traitement de datasets médicaux combinant traduction automatique via DeepL et génération de contenu via OpenAI GPT-4o-mini.
 
+## 📚 Documentation
+
+La documentation complète se trouve dans le répertoire `docs/` :
+
+- **[Interface Web de Traduction](docs/WEB_INTERFACE_USAGE.md)** - Guide complet pour l'interface web interactive
+- **[Déploiement Docker](docs/DOCKER_DEPLOYMENT.md)** - Instructions de déploiement avec Docker
+- **[Exemples de Configuration](docs/examples/)** - Fichiers d'exemple et cas d'usage
+
 ## Vue d'ensemble
 
 Ce package automatise le traitement de datasets médicaux en:

@@ -22,6 +22,8 @@ from rich.logging import RichHandler
 
 from .pipeline import MedicalDatasetProcessor, PipelineConfig
 from .utils.logging import setup_logging
+from .web.app import create_app
+from .web.models import ProcessingMode
 
 
 # Initialize rich console
@@ -470,6 +472,132 @@ def show_stats(stats_file: str):
         
     except Exception as e:
         console.print(f"[red]Error reading stats file:[/red] {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--mode", "-m",
+    type=click.Choice(['automatic', 'semi_automatic', 'manual']),
+    help="Processing mode: automatic (CLI only), semi_automatic (web with auto-translation), manual (web with manual input)"
+)
+@click.option(
+    "--deepl-key",
+    envvar="DEEPL_API_KEY",
+    help="DeepL API key for translation (required for semi_automatic and manual modes)"
+)
+@click.option(
+    "--datasets-config", "-d",
+    default="datasets.yaml",
+    help="Path to datasets configuration YAML file",
+    type=click.Path(exists=True)
+)
+@click.option(
+    "--host",
+    default="0.0.0.0",
+    help="Host address for web interface"
+)
+@click.option(
+    "--port", "-p",
+    default=5000,
+    help="Port for web interface",
+    type=click.IntRange(1, 65535)
+)
+@click.option(
+    "--target-language",
+    default="FR",
+    help="Target language for translation (DeepL language code)"
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug mode for web interface"
+)
+def web(
+    mode: Optional[str],
+    deepl_key: Optional[str],
+    datasets_config: str,
+    host: str,
+    port: int,
+    target_language: str,
+    debug: bool
+):
+    """Launch web interface for interactive translation."""
+    
+    console.print(Panel.fit(
+        "[bold blue]Medical Dataset Processor - Web Interface[/bold blue]\n"
+        "Interactive translation with multiple modes",
+        border_style="blue"
+    ))
+    
+    # If no mode specified, show mode selection
+    if not mode:
+        console.print("\n[yellow]Available processing modes:[/yellow]")
+        console.print("  • [cyan]automatic[/cyan] - Fully automated processing (CLI mode)")
+        console.print("  • [cyan]semi_automatic[/cyan] - Web interface with auto-translation for review/editing")
+        console.print("  • [cyan]manual[/cyan] - Web interface with manual translation input")
+        
+        mode = click.prompt(
+            "\nSelect processing mode",
+            type=click.Choice(['automatic', 'semi_automatic', 'manual']),
+            default='semi_automatic'
+        )
+    
+    processing_mode = ProcessingMode(mode)
+    
+    # Handle automatic mode - redirect to CLI processing
+    if processing_mode == ProcessingMode.AUTOMATIC:
+        console.print("\n[blue]Automatic mode selected - launching CLI processing...[/blue]")
+        console.print("Use 'medical-dataset-processor process' command for full CLI processing options.")
+        return
+    
+    # For web modes, validate DeepL API key
+    if not deepl_key:
+        console.print("[red]Error:[/red] DeepL API key is required for web interface modes")
+        console.print("Use --deepl-key option or set DEEPL_API_KEY environment variable")
+        sys.exit(1)
+    
+    # Set environment variables for the web app
+    os.environ['DEEPL_API_KEY'] = deepl_key
+    os.environ['TARGET_LANGUAGE'] = target_language
+    os.environ['WEB_HOST'] = host
+    os.environ['WEB_PORT'] = str(port)
+    
+    # Display configuration
+    table = Table(title="Web Interface Configuration")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+    
+    table.add_row("Processing Mode", mode)
+    table.add_row("Dataset Config", datasets_config)
+    table.add_row("Target Language", target_language)
+    table.add_row("Host", host)
+    table.add_row("Port", str(port))
+    table.add_row("Debug Mode", "Enabled" if debug else "Disabled")
+    
+    console.print(table)
+    
+    try:
+        # Create and run the Flask app
+        console.print(f"\n[green]Starting web interface...[/green]")
+        console.print(f"[blue]Server will be available at: http://{host}:{port}[/blue]")
+        console.print(f"[blue]Health check: http://{host}:{port}/api/health[/blue]")
+        console.print("\n[yellow]Press Ctrl+C to stop the server[/yellow]")
+        
+        app = create_app()
+        app.run(host=host, port=port, debug=debug)
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Web server stopped by user[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]Failed to start web interface:[/red] {e}")
+        
+        # Provide helpful error messages
+        if "Address already in use" in str(e):
+            console.print(f"[yellow]Port {port} is already in use. Try a different port with --port option.[/yellow]")
+        elif "Invalid DeepL API key" in str(e):
+            console.print("[yellow]Please check your DeepL API key is valid.[/yellow]")
+        
         sys.exit(1)
 
 

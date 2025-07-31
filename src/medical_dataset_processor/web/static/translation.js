@@ -399,17 +399,104 @@ class TranslationInterface {
     
     showStatus(type, message) {
         const statusIndicator = document.getElementById('statusIndicator');
-        if (!statusIndicator) return;
+        if (!statusIndicator) {
+            // Fallback to console if no status indicator
+            console.log(`Status [${type}]: ${message}`);
+            return;
+        }
         
         statusIndicator.className = `status-indicator status-${type}`;
         statusIndicator.textContent = message;
         
+        // Show toast notification for important messages
+        this.showToastNotification(type, message);
+        
         // Auto-hide error messages after 5 seconds
         if (type === 'error') {
             setTimeout(() => {
-                this.showStatus('saved', 'Sauvegardé');
+                if (statusIndicator.textContent === message) {
+                    this.showStatus('saved', 'Prêt');
+                }
             }, 5000);
         }
+    }
+    
+    showToastNotification(type, message) {
+        // Create toast notification for better user feedback
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <span class="toast-icon">${this.getToastIcon(type)}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        // Add to page
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.className = 'toast-container';
+            document.body.appendChild(toastContainer);
+        }
+        
+        toastContainer.appendChild(toast);
+        
+        // Auto-remove after delay
+        const delay = type === 'error' ? 8000 : 4000;
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, delay);
+        
+        // Animate in
+        setTimeout(() => {
+            toast.classList.add('toast-show');
+        }, 100);
+    }
+    
+    getToastIcon(type) {
+        const icons = {
+            'error': '⚠️',
+            'saving': '💾',
+            'saved': '✅',
+            'warning': '⚡',
+            'info': 'ℹ️'
+        };
+        return icons[type] || 'ℹ️';
+    }
+    
+    showErrorDialog(title, message, details = null) {
+        // Create modal error dialog for critical errors
+        const modal = document.createElement('div');
+        modal.className = 'error-modal';
+        modal.innerHTML = `
+            <div class="error-modal-content">
+                <div class="error-modal-header">
+                    <h3>${title}</h3>
+                    <button class="error-modal-close" onclick="this.closest('.error-modal').remove()">×</button>
+                </div>
+                <div class="error-modal-body">
+                    <p>${message}</p>
+                    ${details ? `<details><summary>Détails techniques</summary><pre>${details}</pre></details>` : ''}
+                </div>
+                <div class="error-modal-footer">
+                    <button onclick="this.closest('.error-modal').remove()" class="btn btn-primary">OK</button>
+                    <button onclick="window.location.reload()" class="btn btn-secondary">Recharger la page</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Focus on close button for accessibility
+        setTimeout(() => {
+            const closeBtn = modal.querySelector('.error-modal-close');
+            if (closeBtn) closeBtn.focus();
+        }, 100);
     }
     
     hasUnsavedChanges() {

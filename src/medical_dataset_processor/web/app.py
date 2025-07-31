@@ -378,15 +378,62 @@ class FlaskTranslationApp:
         def not_found(error):
             """Handle 404 errors."""
             if request.path.startswith('/api/'):
-                return jsonify({'error': 'Endpoint not found'}), 404
+                return jsonify({
+                    'error': 'Endpoint not found',
+                    'message': f'The requested endpoint {request.path} was not found',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             return render_template('404.html'), 404
         
         @app.errorhandler(500)
         def internal_error(error):
             """Handle 500 errors."""
+            import traceback
+            error_id = str(uuid.uuid4())[:8]
+            
+            # Log the full error for debugging
+            app.logger.error(f"Internal error {error_id}: {str(error)}")
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
+            
             if request.path.startswith('/api/'):
-                return jsonify({'error': 'Internal server error'}), 500
-            return render_template('500.html'), 500
+                return jsonify({
+                    'error': 'Internal server error',
+                    'error_id': error_id,
+                    'message': 'An unexpected error occurred. Please try again.',
+                    'timestamp': datetime.now().isoformat()
+                }), 500
+            return render_template('500.html', error_id=error_id), 500
+        
+        @app.errorhandler(TranslationError)
+        def handle_translation_error(error):
+            """Handle translation-specific errors."""
+            error_id = str(uuid.uuid4())[:8]
+            app.logger.error(f"Translation error {error_id}: {str(error)}")
+            
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Translation error',
+                    'error_id': error_id,
+                    'message': str(error),
+                    'timestamp': datetime.now().isoformat()
+                }), 503
+            
+            return render_template('500.html', 
+                                 error_message=f"Translation service error: {str(error)}",
+                                 error_id=error_id), 503
+        
+        @app.errorhandler(ValueError)
+        def handle_value_error(error):
+            """Handle validation errors."""
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Validation error',
+                    'message': str(error),
+                    'timestamp': datetime.now().isoformat()
+                }), 400
+            
+            return render_template('500.html', 
+                                 error_message=f"Validation error: {str(error)}"), 400
     
     def _create_demo_samples(self) -> List[Sample]:
         """Create demo samples for testing the translation interface."""
