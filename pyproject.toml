@@ -9,8 +9,13 @@ dependencies = [
     "openai",
     "pyyaml",
     "reportlab",
-    "datasets"
+    "datasets",
+    "click",
+    "rich"
 ]
+
+[project.scripts]
+medical-dataset-processor = "medical_dataset_processor.cli:main"
 
 [project.optional-dependencies]
 dev = [

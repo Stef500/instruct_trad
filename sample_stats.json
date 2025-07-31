@@ -1,0 +1,12 @@
+{
+  "start_time": "2025-01-24T10:00:00",
+  "end_time": "2025-01-24T10:15:30",
+  "datasets_loaded": 4,
+  "samples_selected": 400,
+  "samples_translated": 200,
+  "samples_generated": 200,
+  "samples_exported": 400,
+  "duration_seconds": 930,
+  "duration_formatted": "0:15:30",
+  "errors": []
+}
