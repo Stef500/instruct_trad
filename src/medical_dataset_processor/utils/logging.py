@@ -416,3 +416,38 @@ class ProcessingLogger:
         
         # Low severity for temporary issues
         return ErrorSeverity.LOW
+
+
+def setup_logging(log_level: str = "INFO", log_dir: str = "logs") -> None:
+    """
+    Set up logging configuration for the application.
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_dir: Directory for log files
+    """
+    # Create log directory if it doesn't exist
+    log_path = Path(log_dir)
+    log_path.mkdir(exist_ok=True)
+    
+    # Create log file with timestamp
+    log_file = log_path / f"medical_dataset_processor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()  # Also log to console
+        ]
+    )
+    
+    # Set specific loggers to appropriate levels
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+    logging.getLogger("deepl").setLevel(logging.WARNING)
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Logging initialized. Log file: {log_file}")
