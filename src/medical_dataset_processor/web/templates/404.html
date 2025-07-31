@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Page non trouvée - Interface de Traduction{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+    <div style="font-size: 6rem; color: #ccc; margin-bottom: 1rem;">404</div>
+    <h2 style="color: #333; margin-bottom: 1rem;">Page non trouvée</h2>
+    <p style="color: #666; margin-bottom: 2rem;">
+        La page que vous recherchez n'existe pas ou a été déplacée.
+    </p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+        Retour à l'accueil
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Sélection du Mode - Interface de Traduction{% endblock %}
+
+{% block styles %}
+<style>
+    .mode-selection {
+        max-width: 800px;
+        margin: 2rem auto;
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .mode-selection h2 {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #333;
+        font-size: 1.5rem;
+    }
+    
+    .mode-options {
+        display: grid;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .mode-option {
+        border: 2px solid #e1e5e9;
+        border-radius: 8px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: white;
+    }
+    
+    .mode-option:hover {
+        border-color: #1976d2;
+        background: #f8f9ff;
+    }
+    
+    .mode-option.selected {
+        border-color: #1976d2;
+        background: #f8f9ff;
+    }
+    
+    .mode-option input[type="radio"] {
+        display: none;
+    }
+    
+    .mode-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+    
+    .mode-description {
+        color: #666;
+        line-height: 1.5;
+    }
+    
+    .form-actions {
+        text-align: center;
+        padding-top: 1rem;
+        border-top: 1px solid #e1e5e9;
+    }
+    
+    .btn-large {
+        padding: 16px 32px;
+        font-size: 18px;
+        min-width: 200px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mode-selection">
+    <h2>Choisissez le mode de traduction</h2>
+    
+    <form method="POST" action="{{ url_for('select_mode') }}" id="modeForm">
+        <div class="mode-options">
+            <label class="mode-option" for="automatic">
+                <input type="radio" name="mode" value="automatic" id="automatic">
+                <div class="mode-title">Mode Automatique</div>
+                <div class="mode-description">
+                    Traduction entièrement automatique sans interface web. 
+                    Le système traite tous les éléments de façon programmatique.
+                </div>
+            </label>
+            
+            <label class="mode-option" for="semi_automatic">
+                <input type="radio" name="mode" value="semi_automatic" id="semi_automatic">
+                <div class="mode-title">Mode Semi-Automatique</div>
+                <div class="mode-description">
+                    Interface web avec traductions automatiques que vous pouvez modifier et corriger.
+                    Idéal pour réviser et améliorer les traductions automatiques.
+                </div>
+            </label>
+            
+            <label class="mode-option" for="manual">
+                <input type="radio" name="mode" value="manual" id="manual">
+                <div class="mode-title">Mode Manuel</div>
+                <div class="mode-description">
+                    Interface web avec saisie manuelle complète. 
+                    Vous traduisez chaque élément entièrement à la main.
+                </div>
+            </label>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-large" id="submitBtn" disabled>
+                Commencer la traduction
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modeOptions = document.querySelectorAll('.mode-option');
+        const radioButtons = document.querySelectorAll('input[name="mode"]');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // Handle mode selection
+        modeOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove selected class from all options
+                modeOptions.forEach(opt => opt.classList.remove('selected'));
+                
+                // Add selected class to clicked option
+                this.classList.add('selected');
+                
+                // Check the radio button
+                const radio = this.querySelector('input[type="radio"]');
+                radio.checked = true;
+                
+                // Enable submit button
+                submitBtn.disabled = false;
+            });
+        });
+        
+        // Handle form submission
+        document.getElementById('modeForm').addEventListener('submit', function(e) {
+            const selectedMode = document.querySelector('input[name="mode"]:checked');
+            if (!selectedMode) {
+                e.preventDefault();
+                alert('Veuillez sélectionner un mode de traduction.');
+                return;
+            }
+            
+            // Show loading state
+            submitBtn.textContent = 'Chargement...';
+            submitBtn.disabled = true;
+        });
+    });
+</script>
+{% endblock %}

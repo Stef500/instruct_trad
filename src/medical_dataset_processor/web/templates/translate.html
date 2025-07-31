@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block title %}Interface de Traduction - Mode {{ mode.title() }}{% endblock %}
+
+{% block styles %}
+<style>
+    .translation-interface {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .progress-bar {
+        background: #f8f9fa;
+        border-bottom: 1px solid #e1e5e9;
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .progress-info {
+        font-weight: 500;
+        color: #333;
+    }
+    
+    .progress-visual {
+        flex: 1;
+        max-width: 300px;
+        height: 8px;
+        background: #e1e5e9;
+        border-radius: 4px;
+        margin-left: 2rem;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: #1976d2;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+    
+    .translation-panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        flex: 1;
+        padding: 2rem;
+        overflow: hidden;
+    }
+    
+    .panel {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e1e5e9;
+        border-radius: 8px;
+        background: white;
+        overflow: hidden;
+    }
+    
+    .panel-header {
+        background: #f8f9fa;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e1e5e9;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .panel-content {
+        flex: 1;
+        padding: 1.5rem;
+        overflow-y: auto;
+    }
+    
+    .source-text {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #333;
+        white-space: pre-wrap;
+    }
+    
+    .translation-input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        resize: none;
+        font-size: 16px;
+        line-height: 1.6;
+        font-family: inherit;
+        outline: none;
+        background: transparent;
+    }
+    
+    .translation-input:focus {
+        outline: 2px solid #1976d2;
+        outline-offset: -2px;
+        border-radius: 4px;
+    }
+    
+    .control-buttons {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 2rem;
+        border-top: 1px solid #e1e5e9;
+        background: #f8f9fa;
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .status-indicator {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .status-saved {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+    
+    .status-saving {
+        background: #fff3e0;
+        color: #f57c00;
+    }
+    
+    .status-error {
+        background: #ffebee;
+        color: #c62828;
+    }
+    
+    @media (max-width: 768px) {
+        .translation-panels {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        
+        .control-buttons {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .button-group {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="translation-interface">
+    <div class="progress-bar">
+        <div class="progress-info">
+            Élément <span id="currentItem">{{ progress.current_item }}</span> sur {{ progress.total_items }}
+        </div>
+        <div class="progress-visual">
+            <div class="progress-fill" style="width: {{ progress.percentage }}%"></div>
+        </div>
+    </div>
+    
+    <div class="translation-panels">
+        <div class="panel">
+            <div class="panel-header">Texte source</div>
+            <div class="panel-content">
+                <div class="source-text" id="sourceText">{{ current_item.source_text if current_item else '' }}</div>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <div class="panel-header">Traduction</div>
+            <div class="panel-content">
+                <textarea 
+                    class="translation-input" 
+                    id="translationInput"
+                    {% if mode == 'manual' %}placeholder="Saisissez votre traduction..."{% endif %}
+                >{% if current_item %}{% if mode == 'semi_automatic' and current_item.auto_translation %}{{ current_item.auto_translation }}{% elif current_item.target_text %}{{ current_item.target_text }}{% endif %}{% endif %}</textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="control-buttons">
+        <div class="button-group">
+            <button class="btn btn-secondary" id="prevBtn" onclick="navigate('previous')">
+                Précédent
+            </button>
+            <button class="btn btn-danger" id="clearBtn" onclick="clearTranslation()">
+                Effacer
+            </button>
+        </div>
+        
+        <div class="status-indicator status-saved" id="statusIndicator">
+            Sauvegardé
+        </div>
+        
+        <div class="button-group">
+            <button class="btn btn-primary" id="validateBtn" onclick="validateTranslation()">
+                Valider
+            </button>
+            <button class="btn btn-secondary" id="nextBtn" onclick="navigate('next')">
+                Suivant
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentSessionId = '{{ session_id }}';
+    let currentMode = '{{ mode }}';
+    let autoSaveTimeout;
+    let isNavigating = false;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const translationInput = document.getElementById('translationInput');
+        const statusIndicator = document.getElementById('statusIndicator');
+        
+        // Auto-save functionality
+        translationInput.addEventListener('input', function() {
+            showStatus('saving', 'Sauvegarde...');
+            
+            // Clear existing timeout
+            if (autoSaveTimeout) {
+                clearTimeout(autoSaveTimeout);
+            }
+            
+            // Set new timeout for auto-save
+            autoSaveTimeout = setTimeout(() => {
+                saveTranslation(false);
+            }, 2000); // Auto-save after 2 seconds of inactivity
+        });
+        
+        // Update button states
+        updateButtonStates();
+    });
+    
+    function navigate(direction) {
+        if (isNavigating) return;
+        
+        isNavigating = true;
+        const btn = direction === 'next' ? document.getElementById('nextBtn') : document.getElementById('prevBtn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Chargement...';
+        btn.disabled = true;
+        
+        fetch(`/api/navigate/${direction}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateInterface(data.item, data.progress);
+                    showStatus('saved', 'Sauvegardé');
+                } else {
+                    showStatus('error', data.error || 'Erreur de navigation');
+                }
+            })
+            .catch(error => {
+                console.error('Navigation error:', error);
+                showStatus('error', 'Erreur de connexion');
+            })
+            .finally(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+                isNavigating = false;
+                updateButtonStates();
+            });
+    }
+    
+    function validateTranslation() {
+        saveTranslation(true).then(success => {
+            if (success) {
+                // Auto-navigate to next item after validation
+                setTimeout(() => {
+                    navigate('next');
+                }, 500);
+            }
+        });
+    }
+    
+    function saveTranslation(isValidation = false) {
+        const translationInput = document.getElementById('translationInput');
+        const translation = translationInput.value.trim();
+        
+        if (!translation && isValidation) {
+            showStatus('error', 'Veuillez saisir une traduction');
+            return Promise.resolve(false);
+        }
+        
+        showStatus('saving', 'Sauvegarde...');
+        
+        return fetch('/api/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                translation: translation
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatus('saved', isValidation ? 'Validé et sauvegardé' : 'Sauvegardé');
+                updateProgress(data.progress);
+                return true;
+            } else {
+                showStatus('error', data.error || 'Erreur de sauvegarde');
+                return false;
+            }
+        })
+        .catch(error => {
+            console.error('Save error:', error);
+            showStatus('error', 'Erreur de connexion');
+            return false;
+        });
+    }
+    
+    function clearTranslation() {
+        const translationInput = document.getElementById('translationInput');
+        
+        if (currentMode === 'semi_automatic') {
+            // In semi-automatic mode, restore auto-translation
+            getCurrentItem().then(data => {
+                if (data && data.item && data.item.auto_translation) {
+                    translationInput.value = data.item.auto_translation;
+                } else {
+                    translationInput.value = '';
+                }
+                showStatus('saved', 'Texte restauré');
+            });
+        } else {
+            // In manual mode, just clear the field
+            translationInput.value = '';
+            showStatus('saved', 'Texte effacé');
+        }
+        
+        translationInput.focus();
+    }
+    
+    function getCurrentItem() {
+        return fetch('/api/current')
+            .then(response => response.json())
+            .catch(error => {
+                console.error('Error getting current item:', error);
+                return null;
+            });
+    }
+    
+    function updateInterface(item, progress) {
+        if (item) {
+            document.getElementById('sourceText').textContent = item.source_text;
+            
+            const translationInput = document.getElementById('translationInput');
+            if (currentMode === 'semi_automatic' && item.auto_translation) {
+                translationInput.value = item.target_text || item.auto_translation;
+            } else {
+                translationInput.value = item.target_text || '';
+            }
+        }
+        
+        if (progress) {
+            updateProgress(progress);
+        }
+        
+        updateButtonStates();
+    }
+    
+    function updateProgress(progress) {
+        document.getElementById('currentItem').textContent = progress.current_item;
+        const progressFill = document.querySelector('.progress-fill');
+        progressFill.style.width = progress.percentage + '%';
+    }
+    
+    function updateButtonStates() {
+        getCurrentItem().then(data => {
+            if (data && data.progress) {
+                const progress = data.progress;
+                document.getElementById('prevBtn').disabled = progress.current_item <= 1;
+                document.getElementById('nextBtn').disabled = progress.current_item >= progress.total_items;
+            }
+        });
+    }
+    
+    function showStatus(type, message) {
+        const statusIndicator = document.getElementById('statusIndicator');
+        statusIndicator.className = `status-indicator status-${type}`;
+        statusIndicator.textContent = message;
+        
+        // Auto-hide error messages after 5 seconds
+        if (type === 'error') {
+            setTimeout(() => {
+                showStatus('saved', 'Sauvegardé');
+            }, 5000);
+        }
+    }
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key) {
+                case 's':
+                    e.preventDefault();
+                    saveTranslation(false);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    validateTranslation();
+                    break;
+            }
+        }
+        
+        if (e.altKey) {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    navigate('previous');
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    navigate('next');
+                    break;
+            }
+        }
+    });
+</script>
+{% endblock %}

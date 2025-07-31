@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Erreur serveur - Interface de Traduction{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+    <div style="font-size: 6rem; color: #f44336; margin-bottom: 1rem;">500</div>
+    <h2 style="color: #333; margin-bottom: 1rem;">Erreur serveur</h2>
+    <p style="color: #666; margin-bottom: 2rem;">
+        Une erreur interne s'est produite. Veuillez réessayer plus tard.
+    </p>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+        Retour à l'accueil
+    </a>
+</div>
+{% endblock %}
