@@ -5,7 +5,10 @@ class TranslationInterface {
         this.currentMode = null;
         this.autoSaveTimeout = null;
         this.isNavigating = false;
-        this.autoSaveInterval = 2000; // 2 seconds
+        this.autoSaveInterval = 5000; // 5 seconds as per requirements
+        this.lastSavedContent = '';
+        this.currentProgress = null;
+        this.validationInProgress = false;
         
         this.init();
     }
@@ -20,6 +23,13 @@ class TranslationInterface {
         
         this.bindEvents();
         this.updateButtonStates();
+        this.startAutoSave();
+        
+        // Initialize last saved content
+        const translationInput = document.getElementById('translationInput');
+        if (translationInput) {
+            this.lastSavedContent = translationInput.value.trim();
+        }
     }
     
     getSessionData() {
@@ -108,20 +118,29 @@ class TranslationInterface {
     async navigate(direction) {
         if (this.isNavigating) return;
         
+        // Save current translation before navigating
+        await this.autoSaveCurrentTranslation();
+        
         this.isNavigating = true;
         const btn = direction === 'next' ? 
             document.getElementById('nextBtn') : 
             document.getElementById('prevBtn');
         
-        if (!btn) return;
+        if (!btn || btn.disabled) {
+            this.isNavigating = false;
+            return;
+        }
         
         const originalText = btn.textContent;
         btn.textContent = 'Chargement...';
         btn.disabled = true;
         
+        // Disable all navigation buttons during navigation
+        this.setNavigationButtonsState(true);
+        
         try {
             const response = await fetch(`/api/navigate/${direction}`, {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 }
@@ -131,7 +150,12 @@ class TranslationInterface {
             
             if (data.success) {
                 this.updateInterface(data.item, data.progress);
-                this.showStatus('saved', 'Sauvegardé');
+                this.currentProgress = data.progress;
+                this.lastSavedContent = data.item?.target_text || '';
+                this.showStatus('saved', 'Navigation réussie');
+                
+                // Update progress indicators
+                this.updateProgressIndicators(data.progress);
             } else {
                 this.showStatus('error', data.error || 'Erreur de navigation');
             }
@@ -140,19 +164,70 @@ class TranslationInterface {
             this.showStatus('error', 'Erreur de connexion');
         } finally {
             btn.textContent = originalText;
-            btn.disabled = false;
+            this.setNavigationButtonsState(false);
             this.isNavigating = false;
             this.updateButtonStates();
         }
     }
     
     async validateTranslation() {
-        const success = await this.saveTranslation(true);
-        if (success) {
-            // Auto-navigate to next item after validation
-            setTimeout(() => {
-                this.navigate('next');
-            }, 500);
+        if (this.validationInProgress) return;
+        
+        this.validationInProgress = true;
+        const validateBtn = document.getElementById('validateBtn');
+        
+        if (validateBtn) {
+            const originalText = validateBtn.textContent;
+            validateBtn.textContent = 'Validation...';
+            validateBtn.disabled = true;
+        }
+        
+        try {
+            const translationInput = document.getElementById('translationInput');
+            if (!translationInput) return false;
+            
+            const translation = translationInput.value.trim();
+            
+            // Validate translation content
+            if (!translation) {
+                this.showStatus('error', 'Veuillez saisir une traduction avant de valider');
+                return false;
+            }
+            
+            // Perform client-side validation
+            const validationResult = this.performClientValidation(translation);
+            if (!validationResult.isValid) {
+                this.showStatus('error', validationResult.message);
+                return false;
+            }
+            
+            // Save the validated translation
+            const success = await this.saveTranslation(true);
+            if (success) {
+                this.lastSavedContent = translation;
+                this.showStatus('saved', 'Traduction validée et sauvegardée');
+                
+                // Auto-navigate to next item after validation if not on last item
+                if (this.currentProgress && this.currentProgress.current_item < this.currentProgress.total_items) {
+                    setTimeout(() => {
+                        this.navigate('next');
+                    }, 800);
+                } else {
+                    this.showStatus('saved', 'Dernière traduction validée - Session terminée');
+                }
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Validation error:', error);
+            this.showStatus('error', 'Erreur lors de la validation');
+            return false;
+        } finally {
+            this.validationInProgress = false;
+            if (validateBtn) {
+                validateBtn.textContent = 'Valider';
+                validateBtn.disabled = false;
+            }
         }
     }
     
@@ -204,27 +279,54 @@ class TranslationInterface {
         const translationInput = document.getElementById('translationInput');
         if (!translationInput) return;
         
+        // Show confirmation if there's significant content
+        const currentContent = translationInput.value.trim();
+        if (currentContent.length > 50) {
+            const confirmed = confirm('Êtes-vous sûr de vouloir effacer cette traduction ?');
+            if (!confirmed) return;
+        }
+        
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            const originalText = clearBtn.textContent;
+            clearBtn.textContent = 'Effacement...';
+            clearBtn.disabled = true;
+            
+            setTimeout(() => {
+                clearBtn.textContent = originalText;
+                clearBtn.disabled = false;
+            }, 500);
+        }
+        
         if (this.currentMode === 'semi_automatic') {
             // In semi-automatic mode, restore auto-translation
             try {
                 const data = await this.getCurrentItem();
                 if (data && data.item && data.item.auto_translation) {
                     translationInput.value = data.item.auto_translation;
+                    this.lastSavedContent = data.item.auto_translation;
+                    this.showStatus('saved', 'Traduction automatique restaurée');
                 } else {
                     translationInput.value = '';
+                    this.lastSavedContent = '';
+                    this.showStatus('saved', 'Texte effacé');
                 }
-                this.showStatus('saved', 'Texte restauré');
             } catch (error) {
                 translationInput.value = '';
+                this.lastSavedContent = '';
                 this.showStatus('saved', 'Texte effacé');
             }
         } else {
             // In manual mode, just clear the field
             translationInput.value = '';
+            this.lastSavedContent = '';
             this.showStatus('saved', 'Texte effacé');
         }
         
         translationInput.focus();
+        
+        // Auto-save the cleared state
+        await this.autoSaveCurrentTranslation();
     }
     
     async getCurrentItem() {
@@ -312,7 +414,134 @@ class TranslationInterface {
     
     hasUnsavedChanges() {
         // Check if there are unsaved changes
-        return this.autoSaveTimeout !== null;
+        const translationInput = document.getElementById('translationInput');
+        if (!translationInput) return false;
+        
+        const currentContent = translationInput.value.trim();
+        return currentContent !== this.lastSavedContent || this.autoSaveTimeout !== null;
+    }
+    
+    async autoSaveCurrentTranslation() {
+        // Auto-save current translation before navigation
+        const translationInput = document.getElementById('translationInput');
+        if (!translationInput) return;
+        
+        const currentContent = translationInput.value.trim();
+        if (currentContent !== this.lastSavedContent) {
+            try {
+                const response = await fetch('/api/auto-save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        translation: currentContent
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    this.lastSavedContent = currentContent;
+                }
+            } catch (error) {
+                console.error('Auto-save error:', error);
+            }
+        }
+    }
+    
+    setNavigationButtonsState(disabled) {
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const validateBtn = document.getElementById('validateBtn');
+        
+        if (prevBtn) prevBtn.disabled = disabled;
+        if (nextBtn) nextBtn.disabled = disabled;
+        if (validateBtn) validateBtn.disabled = disabled;
+    }
+    
+    updateProgressIndicators(progress) {
+        // Update progress bar
+        this.updateProgress(progress);
+        
+        // Update additional progress indicators
+        const progressInfo = document.querySelector('.progress-info');
+        if (progressInfo) {
+            progressInfo.innerHTML = `Élément <span id="currentItem">${progress.current_item}</span> sur ${progress.total_items}`;
+        }
+        
+        // Update progress percentage in visual bar
+        const progressFill = document.querySelector('.progress-fill');
+        if (progressFill) {
+            progressFill.style.width = `${progress.percentage}%`;
+            progressFill.setAttribute('aria-valuenow', progress.percentage);
+        }
+        
+        // Add completion status if on last item
+        if (progress.current_item === progress.total_items) {
+            const statusIndicator = document.getElementById('statusIndicator');
+            if (statusIndicator) {
+                statusIndicator.classList.add('completion-ready');
+            }
+        }
+    }
+    
+    performClientValidation(translation) {
+        // Basic client-side validation
+        if (!translation || translation.trim().length === 0) {
+            return {
+                isValid: false,
+                message: 'La traduction ne peut pas être vide'
+            };
+        }
+        
+        // Check minimum length
+        if (translation.trim().length < 2) {
+            return {
+                isValid: false,
+                message: 'La traduction doit contenir au moins 2 caractères'
+            };
+        }
+        
+        // Check maximum length (reasonable limit)
+        if (translation.length > 10000) {
+            return {
+                isValid: false,
+                message: 'La traduction est trop longue (maximum 10 000 caractères)'
+            };
+        }
+        
+        // Check for suspicious patterns (only spaces, repeated characters)
+        if (/^\s+$/.test(translation)) {
+            return {
+                isValid: false,
+                message: 'La traduction ne peut contenir que des espaces'
+            };
+        }
+        
+        // Check for excessive repetition of single character
+        const repeatedChar = /(.)\1{20,}/.test(translation);
+        if (repeatedChar) {
+            return {
+                isValid: false,
+                message: 'La traduction contient trop de caractères répétés'
+            };
+        }
+        
+        return {
+            isValid: true,
+            message: 'Validation réussie'
+        };
+    }
+    
+    startAutoSave() {
+        // Start periodic auto-save
+        if (this.autoSaveInterval > 0) {
+            setInterval(() => {
+                if (this.hasUnsavedChanges()) {
+                    this.autoSaveCurrentTranslation();
+                }
+            }, this.autoSaveInterval);
+        }
     }
 }
 
@@ -400,6 +629,17 @@ function startProcessing() {
     setTimeout(() => {
         window.location.href = '/';
     }, 2000);
+}
+
+function toggleShortcuts() {
+    const panel = document.getElementById('shortcutsPanel');
+    if (panel) {
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
 }
 
 // Initialize appropriate interface based on page

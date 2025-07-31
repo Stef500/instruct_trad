@@ -41,7 +41,7 @@
     
     <div class="control-buttons">
         <div class="button-group">
-            <button class="btn btn-secondary" id="prevBtn" onclick="navigate('previous')">
+            <button class="btn btn-secondary" id="prevBtn" onclick="navigate('previous')" title="Alt + ←">
                 Précédent
             </button>
             <button class="btn btn-danger" id="clearBtn" onclick="clearTranslation()">
@@ -54,12 +54,32 @@
         </div>
         
         <div class="button-group">
-            <button class="btn btn-primary" id="validateBtn" onclick="validateTranslation()">
+            <button class="btn btn-primary" id="validateBtn" onclick="validateTranslation()" title="Ctrl + Entrée">
                 Valider
             </button>
-            <button class="btn btn-secondary" id="nextBtn" onclick="navigate('next')">
+            <button class="btn btn-secondary" id="nextBtn" onclick="navigate('next')" title="Alt + →">
                 Suivant
             </button>
+        </div>
+    </div>
+    
+    <div class="keyboard-shortcuts">
+        <div class="shortcuts-toggle" onclick="toggleShortcuts()">
+            <span>⌨️ Raccourcis clavier</span>
+        </div>
+        <div class="shortcuts-panel" id="shortcutsPanel" style="display: none;">
+            <div class="shortcut-item">
+                <kbd>Ctrl</kbd> + <kbd>S</kbd> <span>Sauvegarder</span>
+            </div>
+            <div class="shortcut-item">
+                <kbd>Ctrl</kbd> + <kbd>Entrée</kbd> <span>Valider</span>
+            </div>
+            <div class="shortcut-item">
+                <kbd>Alt</kbd> + <kbd>←</kbd> <span>Précédent</span>
+            </div>
+            <div class="shortcut-item">
+                <kbd>Alt</kbd> + <kbd>→</kbd> <span>Suivant</span>
+            </div>
         </div>
     </div>
 </div>

@@ -76,6 +76,36 @@ body {
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
+}
+
+.btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.btn:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
 }
 
 .btn-large {
@@ -200,13 +230,48 @@ body {
     border-radius: 4px;
     margin-left: 2rem;
     overflow: hidden;
+    position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    background: #1976d2;
+    background: linear-gradient(90deg, #1976d2, #42a5f5);
     border-radius: 4px;
-    transition: width 0.3s ease;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-bar.completed .progress-fill {
+    background: linear-gradient(90deg, #4caf50, #66bb6a);
+}
+
+.progress-info {
+    font-weight: 500;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.progress-info::before {
+    content: '📊';
+    font-size: 1.2em;
 }
 
 .translation-panels {
@@ -285,21 +350,52 @@ body {
     border-radius: 4px;
     font-size: 14px;
     font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 120px;
+    text-align: center;
 }
 
 .status-saved {
     background: #e8f5e8;
     color: #2e7d32;
+    border: 1px solid #c8e6c9;
 }
 
 .status-saving {
     background: #fff3e0;
     color: #f57c00;
+    border: 1px solid #ffcc02;
+}
+
+.status-saving::after {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 8px;
+    border: 2px solid #f57c00;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
 }
 
 .status-error {
     background: #ffebee;
     color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.status-indicator.completion-ready {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+    font-weight: 600;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Automatic mode styles */
@@ -361,6 +457,79 @@ body {
 
 .processing-info li {
     margin-bottom: 0.5rem;
+}
+
+/* Keyboard shortcuts styles */
+.keyboard-shortcuts {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.shortcuts-toggle {
+    background: #1976d2;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.shortcuts-toggle:hover {
+    background: #1565c0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.shortcuts-panel {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    min-width: 200px;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.shortcut-item kbd {
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-family: monospace;
+    margin: 0 2px;
+}
+
+.shortcut-item span {
+    color: #666;
+    margin-left: 8px;
 }
 
 /* Responsive design */
