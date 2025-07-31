@@ -37,9 +37,27 @@ class TestFlaskTranslationApp:
         return SessionManager(storage_dir=temp_dir)
     
     @pytest.fixture
-    def app(self, session_manager):
+    def mock_translation_service(self, session_manager):
+        """Create a mock translation service for testing."""
+        from unittest.mock import Mock
+        from src.medical_dataset_processor.web.translation_service import WebTranslationService
+        from src.medical_dataset_processor.processors.translation_processor import TranslationProcessor
+        
+        # Create mock translation processor
+        mock_processor = Mock(spec=TranslationProcessor)
+        mock_processor.translate_samples.return_value = []
+        mock_processor.get_usage_info.return_value = {
+            'character_count': 1000,
+            'character_limit': 500000,
+            'character_usage_percent': 0.2
+        }
+        
+        return WebTranslationService(mock_processor, session_manager)
+    
+    @pytest.fixture
+    def app(self, session_manager, mock_translation_service):
         """Create a Flask test application."""
-        flask_app = FlaskTranslationApp(session_manager)
+        flask_app = FlaskTranslationApp(session_manager, mock_translation_service)
         app = flask_app.get_app()
         app.config['TESTING'] = True
         app.config['SECRET_KEY'] = 'test-secret-key'
@@ -317,10 +335,30 @@ class TestFlaskAppIntegration:
             yield temp_dir
     
     @pytest.fixture
-    def app(self, temp_dir):
+    def mock_translation_service(self, temp_dir):
+        """Create a mock translation service for testing."""
+        from unittest.mock import Mock
+        from src.medical_dataset_processor.web.translation_service import WebTranslationService
+        from src.medical_dataset_processor.processors.translation_processor import TranslationProcessor
+        
+        session_manager = SessionManager(storage_dir=temp_dir)
+        
+        # Create mock translation processor
+        mock_processor = Mock(spec=TranslationProcessor)
+        mock_processor.translate_samples.return_value = []
+        mock_processor.get_usage_info.return_value = {
+            'character_count': 1000,
+            'character_limit': 500000,
+            'character_usage_percent': 0.2
+        }
+        
+        return WebTranslationService(mock_processor, session_manager)
+    
+    @pytest.fixture
+    def app(self, temp_dir, mock_translation_service):
         """Create a Flask test application with temporary storage."""
         session_manager = SessionManager(storage_dir=temp_dir)
-        app = create_app(session_manager)
+        app = create_app(session_manager, mock_translation_service)
         app.config['TESTING'] = True
         app.config['SECRET_KEY'] = 'test-secret-key'
         return app

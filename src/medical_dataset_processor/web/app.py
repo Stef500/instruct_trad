@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_cors import CORS
 
+from ..models.core import Sample
+from ..processors.translation_processor import TranslationProcessor, TranslationConfig, TranslationError
 from .models import (
     ProcessingMode, 
     TranslationItem, 
@@ -19,14 +21,40 @@ from .models import (
     SessionManager,
     TranslationStatus
 )
+from .translation_service import WebTranslationService
 
 
 class FlaskTranslationApp:
     """Flask application for translation interface."""
     
-    def __init__(self, session_manager: Optional[SessionManager] = None):
+    def __init__(
+        self, 
+        session_manager: Optional[SessionManager] = None,
+        translation_service: Optional[WebTranslationService] = None
+    ):
         """Initialize the Flask application."""
         self.session_manager = session_manager or SessionManager()
+        
+        # Initialize translation service if not provided
+        if translation_service is None:
+            # Create default translation processor
+            api_key = os.environ.get('DEEPL_API_KEY')
+            if not api_key:
+                raise ValueError("DEEPL_API_KEY environment variable is required")
+            
+            translation_config = TranslationConfig(
+                api_key=api_key,
+                target_language=os.environ.get('TARGET_LANGUAGE', 'FR'),
+                max_retries=int(os.environ.get('TRANSLATION_MAX_RETRIES', '3')),
+                base_delay=float(os.environ.get('TRANSLATION_BASE_DELAY', '1.0')),
+                max_delay=float(os.environ.get('TRANSLATION_MAX_DELAY', '60.0'))
+            )
+            
+            translation_processor = TranslationProcessor(translation_config)
+            self.translation_service = WebTranslationService(translation_processor, self.session_manager)
+        else:
+            self.translation_service = translation_service
+        
         self.app = self._create_app()
     
     def _create_app(self) -> Flask:
@@ -93,10 +121,19 @@ class FlaskTranslationApp:
                 translation_session = self.session_manager.load_session(session_id)
             
             if not translation_session:
-                # Create a demo session for now (in real implementation, this would come from dataset)
-                translation_session = self._create_demo_session(mode)
-                session['translation_session_id'] = translation_session.session_id
-                self.session_manager.save_session(translation_session)
+                # Create a session using the translation service with demo data
+                demo_samples = self._create_demo_samples()
+                processing_mode = ProcessingMode(mode)
+                
+                try:
+                    translation_session = self.translation_service.create_translation_session(
+                        samples=demo_samples,
+                        mode=processing_mode,
+                        target_language=os.environ.get('TARGET_LANGUAGE', 'FR')
+                    )
+                    session['translation_session_id'] = translation_session.session_id
+                except TranslationError as e:
+                    return render_template('500.html', error=f"Failed to create translation session: {e}"), 500
             
             current_item = translation_session.get_current_item()
             progress_info = translation_session.get_progress_info()
@@ -144,13 +181,20 @@ class FlaskTranslationApp:
                 return jsonify({'error': 'Translation text required'}), 400
             
             translation = data['translation']
-            success = translation_session.update_current_translation(translation)
+            
+            # Use translation service for validation and saving
+            success = self.translation_service.update_session_translation(
+                session_id=session_id,
+                item_index=translation_session.current_index,
+                translation=translation
+            )
             
             if success:
-                self.session_manager.save_session(translation_session)
+                # Get updated progress info
+                progress_info = self.translation_service.get_session_progress(session_id)
                 return jsonify({
                     'success': True,
-                    'progress': translation_session.get_progress_info()
+                    'progress': progress_info
                 })
             else:
                 return jsonify({'error': 'Failed to save translation'}), 500
@@ -196,18 +240,28 @@ class FlaskTranslationApp:
             if mode not in [m.value for m in ProcessingMode]:
                 return jsonify({'error': 'Invalid mode'}), 400
             
-            # Create session with demo data (in real implementation, use actual dataset)
-            translation_session = self._create_demo_session(mode)
-            self.session_manager.save_session(translation_session)
+            # Create session using translation service with demo data
+            demo_samples = self._create_demo_samples()
+            processing_mode = ProcessingMode(mode)
             
-            # Store session ID in Flask session
-            session['translation_session_id'] = translation_session.session_id
-            session.permanent = True
-            
-            return jsonify({
-                'session_id': translation_session.session_id,
-                'progress': translation_session.get_progress_info()
-            }), 201
+            try:
+                translation_session = self.translation_service.create_translation_session(
+                    samples=demo_samples,
+                    mode=processing_mode,
+                    target_language=os.environ.get('TARGET_LANGUAGE', 'FR')
+                )
+                
+                # Store session ID in Flask session
+                session['translation_session_id'] = translation_session.session_id
+                session.permanent = True
+                
+                return jsonify({
+                    'session_id': translation_session.session_id,
+                    'progress': translation_session.get_progress_info()
+                }), 201
+                
+            except TranslationError as e:
+                return jsonify({'error': f'Failed to create session: {str(e)}'}), 500
         
         @app.route('/api/session/<session_id>')
         def get_session(session_id):
@@ -219,6 +273,95 @@ class FlaskTranslationApp:
             return jsonify({
                 'session': translation_session.to_dict(),
                 'progress': translation_session.get_progress_info()
+            })
+        
+        @app.route('/api/auto-save', methods=['POST'])
+        def auto_save():
+            """Auto-save current translation."""
+            session_id = session.get('translation_session_id')
+            if not session_id:
+                return jsonify({'error': 'No active session'}), 404
+            
+            data = request.get_json()
+            if not data or 'translation' not in data:
+                return jsonify({'error': 'Translation text required'}), 400
+            
+            translation = data['translation']
+            translation_session = self.session_manager.load_session(session_id)
+            
+            if not translation_session:
+                return jsonify({'error': 'Session not found'}), 404
+            
+            # Update translation without changing status (auto-save)
+            current_item = translation_session.get_current_item()
+            if current_item:
+                current_item.target_text = translation
+                current_item.updated_at = datetime.now()
+                translation_session.last_activity = datetime.now()
+                
+                success = self.session_manager.auto_save_session(translation_session)
+                return jsonify({'success': success, 'auto_saved': True})
+            
+            return jsonify({'error': 'No current item to save'}), 400
+        
+        @app.route('/api/validate', methods=['POST'])
+        def validate_translation():
+            """Validate a translation without saving."""
+            data = request.get_json()
+            if not data or 'translation' not in data:
+                return jsonify({'error': 'Translation text required'}), 400
+            
+            translation = data['translation']
+            validation_result = self.translation_service.validate_translation(translation)
+            
+            return jsonify(validation_result)
+        
+        @app.route('/api/usage')
+        def get_usage_info():
+            """Get translation API usage information."""
+            usage_info = self.translation_service.get_translation_usage_info()
+            if usage_info:
+                return jsonify(usage_info)
+            else:
+                return jsonify({'error': 'Usage information not available'}), 503
+        
+        @app.route('/api/session/<session_id>/export')
+        def export_session(session_id):
+            """Export completed translations from a session."""
+            translated_samples = self.translation_service.export_session_results(session_id)
+            
+            if translated_samples is None:
+                return jsonify({'error': 'Session not found'}), 404
+            
+            # Convert to serializable format
+            export_data = []
+            for sample in translated_samples:
+                export_data.append({
+                    'original_id': sample.sample.id,
+                    'source_dataset': sample.sample.source_dataset,
+                    'original_text': sample.sample.original_text,
+                    'translated_text': sample.translated_text,
+                    'metadata': sample.translation_metadata,
+                    'processing_timestamp': sample.processing_timestamp.isoformat()
+                })
+            
+            return jsonify({
+                'session_id': session_id,
+                'exported_count': len(export_data),
+                'translations': export_data
+            })
+        
+        @app.route('/api/cleanup', methods=['POST'])
+        def cleanup_sessions():
+            """Clean up expired sessions."""
+            data = request.get_json() or {}
+            max_age_hours = data.get('max_age_hours', 24)
+            
+            cleaned_count = self.translation_service.cleanup_expired_sessions(max_age_hours)
+            
+            return jsonify({
+                'cleaned_sessions': cleaned_count,
+                'max_age_hours': max_age_hours
             })
         
         @app.route('/api/health')
@@ -244,6 +387,29 @@ class FlaskTranslationApp:
             if request.path.startswith('/api/'):
                 return jsonify({'error': 'Internal server error'}), 500
             return render_template('500.html'), 500
+    
+    def _create_demo_samples(self) -> List[Sample]:
+        """Create demo samples for testing the translation interface."""
+        return [
+            Sample(
+                id="sample_1",
+                content={"text": "The patient presents with acute chest pain and shortness of breath."},
+                source_dataset="demo_medical_dataset",
+                original_text="The patient presents with acute chest pain and shortness of breath."
+            ),
+            Sample(
+                id="sample_2",
+                content={"text": "Blood pressure is elevated at 180/100 mmHg."},
+                source_dataset="demo_medical_dataset", 
+                original_text="Blood pressure is elevated at 180/100 mmHg."
+            ),
+            Sample(
+                id="sample_3",
+                content={"text": "Recommend immediate cardiac evaluation and monitoring."},
+                source_dataset="demo_medical_dataset",
+                original_text="Recommend immediate cardiac evaluation and monitoring."
+            )
+        ]
     
     def _create_demo_session(self, mode: str) -> TranslationSession:
         """Create a demo translation session for testing."""
@@ -285,9 +451,12 @@ class FlaskTranslationApp:
         return self.app
 
 
-def create_app(session_manager: Optional[SessionManager] = None) -> Flask:
+def create_app(
+    session_manager: Optional[SessionManager] = None,
+    translation_service: Optional[WebTranslationService] = None
+) -> Flask:
     """Factory function to create Flask application."""
-    flask_app = FlaskTranslationApp(session_manager)
+    flask_app = FlaskTranslationApp(session_manager, translation_service)
     return flask_app.get_app()
 
 
