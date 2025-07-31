@@ -1,5 +1,5 @@
-# Configuration des datasets médicaux pour le traitement automatisé
-# Chaque dataset sera traité avec 50 échantillons pour traduction et 50 pour génération
+# Configuration avancée avec tous les datasets et options
+# Inclut des paramètres de performance et de qualité
 
 medqa:
   name: "medqa"
@@ -10,6 +10,9 @@ medqa:
   text_fields: ["question", "answer"]
   description: "Medical Question Answering dataset with clinical questions and answers"
   language: "en"
+  quality_filters:
+    min_text_length: 50
+    max_text_length: 2000
 
 pubmedqa:
   name: "pubmedqa"
@@ -20,6 +23,9 @@ pubmedqa:
   text_fields: ["question", "context", "final_decision"]
   description: "PubMed-based question answering dataset for biomedical research"
   language: "en"
+  quality_filters:
+    min_text_length: 100
+    max_text_length: 3000
 
 healthsearchqa:
   name: "healthsearchqa"
@@ -29,6 +35,9 @@ healthsearchqa:
   text_fields: ["question", "answer"]
   description: "Health-focused search question answering dataset"
   language: "en"
+  quality_filters:
+    min_text_length: 30
+    max_text_length: 1500
 
 mmlu_clinical:
   name: "mmlu_clinical"
@@ -39,11 +48,42 @@ mmlu_clinical:
   text_fields: ["question", "choices", "answer"]
   description: "MMLU clinical knowledge subset for medical reasoning"
   language: "en"
+  quality_filters:
+    min_text_length: 50
+    max_text_length: 1000
 
-# Configuration globale pour le traitement
+# Configuration avancée du traitement
 processing_config:
   translation_samples_per_dataset: 50
   generation_samples_per_dataset: 50
   target_language: "fr"
   output_format: "jsonl"
   pdf_sample_size: 100
+  
+  # Paramètres de traduction
+  translation:
+    batch_size: 10
+    max_retries: 3
+    retry_delay: 2
+    formality: "default"  # "more", "less", "default"
+    
+  # Paramètres de génération
+  generation:
+    model: "gpt-4o-mini"
+    max_tokens: 500
+    temperature: 0.7
+    prompt_length: 100
+    batch_size: 5
+    
+  # Paramètres de performance
+  performance:
+    max_concurrent_requests: 5
+    request_timeout: 30
+    enable_caching: true
+    cache_ttl: 3600
+    
+  # Paramètres de qualité
+  quality:
+    enable_validation: true
+    min_confidence_score: 0.8
+    enable_duplicate_detection: true

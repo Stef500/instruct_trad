@@ -1,0 +1,23 @@
+# Configuration minimale pour traitement rapide
+# Traite seulement 2 datasets avec moins d'échantillons
+
+medqa:
+  name: "medqa"
+  source_type: "huggingface"
+  source_path: "bigbio/med_qa"
+  subset: "med_qa_en_bigbio_qa"
+  text_fields: ["question", "answer"]
+
+pubmedqa:
+  name: "pubmedqa"
+  source_type: "huggingface"
+  source_path: "bigbio/pubmed_qa"
+  subset: "pubmed_qa_labeled_fold0_bigbio_qa"
+  text_fields: ["question", "context", "final_decision"]
+
+processing_config:
+  translation_samples_per_dataset: 10
+  generation_samples_per_dataset: 10
+  target_language: "fr"
+  output_format: "jsonl"
+  pdf_sample_size: 20
