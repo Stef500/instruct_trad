@@ -8,8 +8,8 @@ from datetime import datetime
 
 import deepl
 
-from src.medical_dataset_processor.models.core import Sample, TranslatedSample
-from src.medical_dataset_processor.processors.translation_processor import (
+from medical_dataset_processor.models.core import Sample, TranslatedSample
+from medical_dataset_processor.processors.translation_processor import (
     TranslationProcessor,
     TranslationConfig,
     TranslationError,
@@ -111,7 +111,7 @@ class TestTranslationConfig:
 class TestTranslationProcessor:
     """Test TranslationProcessor class."""
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_initialization_success(self, mock_translator_class, translation_config):
         """Test successful processor initialization."""
         mock_translator = Mock()
@@ -123,7 +123,7 @@ class TestTranslationProcessor:
         mock_translator_class.assert_called_once_with(translation_config.api_key)
         mock_translator.get_usage.assert_called_once()
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_initialization_auth_error(self, mock_translator_class, translation_config):
         """Test initialization with authentication error."""
         mock_translator_class.side_effect = deepl.AuthorizationException("Invalid API key")
@@ -131,7 +131,7 @@ class TestTranslationProcessor:
         with pytest.raises(TranslationError, match="Invalid DeepL API key"):
             TranslationProcessor(translation_config)
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_initialization_general_error(self, mock_translator_class, translation_config):
         """Test initialization with general error."""
         mock_translator_class.side_effect = Exception("Connection failed")
@@ -139,7 +139,7 @@ class TestTranslationProcessor:
         with pytest.raises(TranslationError, match="Failed to initialize DeepL translator"):
             TranslationProcessor(translation_config)
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_translate_samples_success(self, mock_translator_class, translation_config, sample_data):
         """Test successful translation of samples."""
         mock_translator = Mock()
@@ -170,7 +170,7 @@ class TestTranslationProcessor:
         assert results[0].translation_metadata["api_version"] == "deepl"
         assert results[0].translation_metadata["attempt"] == 1
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_translate_samples_empty_list(self, mock_translator_class, translation_config):
         """Test translation with empty sample list."""
         mock_translator = Mock()
@@ -182,7 +182,7 @@ class TestTranslationProcessor:
         assert results == []
         mock_translator.translate_text.assert_not_called()
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_translate_single_sample_quota_exceeded(self, mock_translator_class, translation_config, sample_data):
         """Test handling of quota exceeded error."""
         mock_translator = Mock()
@@ -194,7 +194,7 @@ class TestTranslationProcessor:
         with pytest.raises(TranslationError, match="DeepL quota exceeded"):
             processor._translate_single_sample(sample_data[0])
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     @patch('time.sleep')
     def test_translate_single_sample_rate_limit_retry(self, mock_sleep, mock_translator_class, translation_config, sample_data):
         """Test retry logic for rate limit errors."""
@@ -224,7 +224,7 @@ class TestTranslationProcessor:
         mock_sleep.assert_any_call(0.1)  # First retry: base_delay * 2^0
         mock_sleep.assert_any_call(0.2)  # Second retry: base_delay * 2^1
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     @patch('time.sleep')
     def test_translate_single_sample_max_retries_exceeded(self, mock_sleep, mock_translator_class, translation_config, sample_data):
         """Test failure after max retries exceeded."""
@@ -241,7 +241,7 @@ class TestTranslationProcessor:
         assert mock_translator.translate_text.call_count == translation_config.max_retries
         assert mock_sleep.call_count == translation_config.max_retries - 1
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_translate_single_sample_auth_error(self, mock_translator_class, translation_config, sample_data):
         """Test handling of authorization errors."""
         mock_translator = Mock()
@@ -253,7 +253,7 @@ class TestTranslationProcessor:
         with pytest.raises(TranslationError, match="Authorization failed"):
             processor._translate_single_sample(sample_data[0])
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     @patch('time.sleep')
     def test_translate_single_sample_general_deepl_error(self, mock_sleep, mock_translator_class, translation_config, sample_data):
         """Test handling of general DeepL API errors with retry."""
@@ -286,7 +286,7 @@ class TestTranslationProcessor:
         processor.config.base_delay = 10.0
         assert processor._calculate_backoff_delay(10) == 1.0  # Should be capped at max_delay
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_get_usage_info_success(self, mock_translator_class, translation_config):
         """Test successful usage info retrieval."""
         mock_translator = Mock()
@@ -305,7 +305,7 @@ class TestTranslationProcessor:
         assert usage_info["character_limit"] == 500000
         assert usage_info["character_usage_percent"] == 0.2  # 1000/500000 * 100
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_get_usage_info_error(self, mock_translator_class, translation_config):
         """Test usage info retrieval with error."""
         mock_translator = Mock()
@@ -322,7 +322,7 @@ class TestTranslationProcessor:
         
         assert usage_info is None
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_validate_target_language_success(self, mock_translator_class, translation_config):
         """Test successful language validation."""
         mock_translator = Mock()
@@ -338,7 +338,7 @@ class TestTranslationProcessor:
         assert processor.validate_target_language("fr") is True  # Case insensitive
         assert processor.validate_target_language("ES") is False
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_validate_target_language_error(self, mock_translator_class, translation_config):
         """Test language validation with API error."""
         mock_translator = Mock()
@@ -349,7 +349,7 @@ class TestTranslationProcessor:
         
         assert processor.validate_target_language("FR") is False
     
-    @patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+    @patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
     def test_translate_samples_partial_failure(self, mock_translator_class, translation_config, sample_data):
         """Test translation with some samples failing."""
         mock_translator = Mock()

@@ -504,14 +504,15 @@ class MedicalDatasetProcessor:
             validation_results["errors"].append(f"Dataset configuration file not found: {self.config.datasets_yaml_path}")
             validation_results["valid"] = False
         
-        # Check API keys
-        if not self.config.deepl_api_key:
-            validation_results["errors"].append("DeepL API key is required")
-            validation_results["valid"] = False
-        
-        if not self.config.openai_api_key:
-            validation_results["errors"].append("OpenAI API key is required")
-            validation_results["valid"] = False
+        # Check API keys (only if not using Ollama)
+        if not self.config.use_ollama:
+            if not self.config.deepl_api_key:
+                validation_results["errors"].append("DeepL API key is required")
+                validation_results["valid"] = False
+            
+            if not self.config.openai_api_key:
+                validation_results["errors"].append("OpenAI API key is required")
+                validation_results["valid"] = False
         
         # Check output directory permissions
         try:

@@ -5,8 +5,8 @@ import pytest
 import random
 from unittest.mock import patch
 
-from src.medical_dataset_processor.models.core import Sample
-from src.medical_dataset_processor.processors.sample_selector import SampleSelector
+from medical_dataset_processor.models.core import Sample
+from medical_dataset_processor.processors.sample_selector import SampleSelector
 
 
 class TestSampleSelector:
@@ -240,7 +240,7 @@ class TestSampleSelector:
         selected_ids = {sample.id for sample in selected}
         assert original_ids == selected_ids
     
-    @patch('src.medical_dataset_processor.processors.sample_selector.logger')
+    @patch('medical_dataset_processor.processors.sample_selector.logger')
     def test_logging_calls(self, mock_logger):
         """Test that appropriate logging calls are made."""
         self.selector.select_for_translation(self.test_samples, 30)

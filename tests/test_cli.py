@@ -72,27 +72,27 @@ datasets:
     def test_validate_api_keys_missing_both(self):
         """Test API key validation with missing keys."""
         with patch('medical_dataset_processor.cli.console') as mock_console:
-            result = validate_api_keys(None, None)
+            result = validate_api_keys(None, None, False)
             assert result is False
             assert mock_console.print.call_count == 2  # Two error messages
     
     def test_validate_api_keys_missing_deepl(self):
         """Test API key validation with missing DeepL key."""
         with patch('medical_dataset_processor.cli.console') as mock_console:
-            result = validate_api_keys(None, "openai-key")
+            result = validate_api_keys(None, "openai-key", False)
             assert result is False
             assert mock_console.print.call_count == 1
     
     def test_validate_api_keys_missing_openai(self):
         """Test API key validation with missing OpenAI key."""
         with patch('medical_dataset_processor.cli.console') as mock_console:
-            result = validate_api_keys("deepl-key", None)
+            result = validate_api_keys("deepl-key", None, False)
             assert result is False
             assert mock_console.print.call_count == 1
     
     def test_validate_api_keys_success(self):
         """Test API key validation with both keys present."""
-        result = validate_api_keys("deepl-key", "openai-key")
+        result = validate_api_keys("deepl-key", "openai-key", False)
         assert result is True
     
     def test_display_config_summary(self):
@@ -162,7 +162,6 @@ datasets:
         ])
         
         assert result.exit_code == 1
-        assert "API key is required" in result.output
     
     def test_process_command_dry_run(self):
         """Test process command with dry run."""

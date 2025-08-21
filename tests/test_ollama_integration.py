@@ -41,7 +41,10 @@ def test_ollama_setup():
         for warning in results["warnings"]:
             print(f"  • {warning}")
     
-    return results
+    # Assert expected keys exist; do not return a value from test
+    assert "ollama_installed" in results
+    assert "server_running" in results
+    assert "croissantlm_available" in results
 
 
 def test_ollama_processor():
@@ -96,11 +99,12 @@ def test_ollama_processor():
         else:
             print("Generation failed - no samples returned")
         
-        return True
+        # Assert did not raise; do not return a value from test
+        assert True
         
     except Exception as e:
         print(f"Error testing Ollama processor: {e}")
-        return False
+        pytest.fail(f"Error testing Ollama processor: {e}")
 
 
 def main():

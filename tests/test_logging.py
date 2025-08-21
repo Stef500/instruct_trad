@@ -9,10 +9,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import pytest
 
-from src.medical_dataset_processor.utils.logging import (
+from medical_dataset_processor.utils.logging import (
     ProcessingLogger, APIError, ProcessingStats, ErrorReport, ProcessingState, ErrorSeverity
 )
-from src.medical_dataset_processor.models.core import Sample
+from medical_dataset_processor.models.core import Sample
 
 
 class TestAPIError:

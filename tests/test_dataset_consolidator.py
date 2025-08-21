@@ -5,11 +5,11 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from src.medical_dataset_processor.models.core import (
+from medical_dataset_processor.models.core import (
     Sample, TranslatedSample, GeneratedSample, ProcessedSample, 
     ConsolidatedDataset, ProcessingType
 )
-from src.medical_dataset_processor.processors.dataset_consolidator import DatasetConsolidator
+from medical_dataset_processor.processors.dataset_consolidator import DatasetConsolidator
 
 
 class TestDatasetConsolidator:
@@ -356,7 +356,7 @@ class TestDatasetConsolidator:
         assert stats['total_processed'] == 0
         assert stats['validation_errors'] == 0
     
-    @patch('src.medical_dataset_processor.processors.dataset_consolidator.logger')
+    @patch('medical_dataset_processor.processors.dataset_consolidator.logger')
     @patch.object(DatasetConsolidator, '_convert_translated_sample')
     def test_consolidate_with_processing_errors(self, mock_convert, mock_logger):
         """Test consolidation handles processing errors gracefully."""

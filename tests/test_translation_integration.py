@@ -5,8 +5,8 @@ import pytest
 from unittest.mock import Mock, patch
 import deepl
 
-from src.medical_dataset_processor.models.core import Sample
-from src.medical_dataset_processor.processors.translation_processor import (
+from medical_dataset_processor.models.core import Sample
+from medical_dataset_processor.processors.translation_processor import (
     TranslationProcessor,
     TranslationConfig
 )
@@ -50,7 +50,7 @@ def test_translation_processor_integration():
         max_delay=1.0
     )
     
-    with patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
+    with patch('medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
         mock_translator = Mock()
         mock_translator_class.return_value = mock_translator
         
@@ -101,7 +101,7 @@ def test_translation_processor_integration():
 
 
 @patch('time.sleep')
-@patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator')
+@patch('medical_dataset_processor.processors.translation_processor.deepl.Translator')
 def test_translation_processor_error_handling(mock_translator_class, mock_sleep):
     """
     Test that demonstrates error handling and retry logic.
@@ -164,7 +164,7 @@ def test_translation_processor_usage_monitoring():
     
     config = TranslationConfig(api_key="test_api_key")
     
-    with patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
+    with patch('medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
         mock_translator = Mock()
         mock_translator_class.return_value = mock_translator
         
@@ -191,7 +191,7 @@ def test_translation_processor_language_validation():
     
     config = TranslationConfig(api_key="test_api_key")
     
-    with patch('src.medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
+    with patch('medical_dataset_processor.processors.translation_processor.deepl.Translator') as mock_translator_class:
         mock_translator = Mock()
         mock_translator_class.return_value = mock_translator
         

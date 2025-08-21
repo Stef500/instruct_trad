@@ -5,9 +5,9 @@ import tempfile
 from unittest.mock import Mock, patch
 import pytest
 
-from src.medical_dataset_processor.utils.logging import ProcessingLogger, ProcessingStats
-from src.medical_dataset_processor.utils.state_recovery import StateRecoveryManager, BatchProcessor
-from src.medical_dataset_processor.models.core import Sample
+from medical_dataset_processor.utils.logging import ProcessingLogger, ProcessingStats
+from medical_dataset_processor.utils.state_recovery import StateRecoveryManager, BatchProcessor
+from medical_dataset_processor.models.core import Sample
 
 
 class TestStateRecoveryManager:

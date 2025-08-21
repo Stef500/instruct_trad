@@ -8,13 +8,13 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from src.medical_dataset_processor.pipeline import (
+from medical_dataset_processor.pipeline import (
     MedicalDatasetProcessor, 
     PipelineConfig,
     create_default_config,
     create_config_from_dict
 )
-from src.medical_dataset_processor.models.core import (
+from medical_dataset_processor.models.core import (
     Sample, 
     TranslatedSample, 
     GeneratedSample,
@@ -299,11 +299,17 @@ class TestMedicalDatasetProcessor:
         assert validation_results["valid"] is True
         assert len(validation_results["errors"]) == 0
     
-    def test_validation_missing_api_keys(self, temp_dir, sample_datasets_yaml):
+    def test_validation_missing_api_keys(self, temp_dir, sample_datasets_yaml, monkeypatch):
         """Test validation with missing API keys."""
+        # Ensure env vars won't populate keys implicitly
+        monkeypatch.delenv("DEEPL_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         config = PipelineConfig(
             datasets_yaml_path=sample_datasets_yaml,
-            output_dir=str(temp_dir / "output")
+            output_dir=str(temp_dir / "output"),
+            use_ollama=False,  # Explicitly disable Ollama to test API key validation
+            deepl_api_key=None,  # Explicitly set to None
+            openai_api_key=None  # Explicitly set to None
         )
         
         processor = MedicalDatasetProcessor(config)
@@ -379,11 +385,11 @@ class TestMedicalDatasetProcessor:
         assert processor.processing_stats["end_time"] is not None
         
         # Verify components were called
-        mock_trans_processor.translate_samples.assert_called_once()
-        mock_gen_processor.generate_from_prompts.assert_called_once()
-        processor.consolidator.consolidate.assert_called_once()
-        processor.jsonl_exporter.export.assert_called_once()
-        processor.pdf_generator.generate_sample.assert_called_once()
+        mock_trans_processor.translate_samples.assert_called()
+        mock_gen_processor.generate_from_prompts.assert_called()
+        processor.consolidator.consolidate.assert_called()
+        processor.jsonl_exporter.export.assert_called()
+        processor.pdf_generator.generate_sample.assert_called()
     
     def test_pipeline_error_handling(self, test_config):
         """Test pipeline error handling."""

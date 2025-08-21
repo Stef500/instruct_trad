@@ -25,3 +25,9 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0"
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests d'intégration réels/longs",
+    "slow: tests longs à exécuter"
+]

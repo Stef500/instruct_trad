@@ -8,20 +8,20 @@ import shutil
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
-from src.medical_dataset_processor.models.core import Sample, TranslatedSample
-from src.medical_dataset_processor.processors.translation_processor import (
+from medical_dataset_processor.models.core import Sample, TranslatedSample
+from medical_dataset_processor.processors.translation_processor import (
     TranslationProcessor, 
     TranslationConfig, 
     TranslationError
 )
-from src.medical_dataset_processor.web.models import (
+from medical_dataset_processor.web.models import (
     ProcessingMode, 
     TranslationItem, 
     TranslationSession, 
     SessionManager,
     TranslationStatus
 )
-from src.medical_dataset_processor.web.translation_service import WebTranslationService
+from medical_dataset_processor.web.translation_service import WebTranslationService
 
 
 class TestWebTranslationServiceIntegration:

@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from src.medical_dataset_processor.web.app import FlaskTranslationApp, create_app
-from src.medical_dataset_processor.web.models import (
+from medical_dataset_processor.web.app import FlaskTranslationApp, create_app
+from medical_dataset_processor.web.models import (
     ProcessingMode, 
     TranslationItem, 
     TranslationSession, 
@@ -40,8 +40,8 @@ class TestFlaskTranslationApp:
     def mock_translation_service(self, session_manager):
         """Create a mock translation service for testing."""
         from unittest.mock import Mock
-        from src.medical_dataset_processor.web.translation_service import WebTranslationService
-        from src.medical_dataset_processor.processors.translation_processor import TranslationProcessor
+        from medical_dataset_processor.web.translation_service import WebTranslationService
+        from medical_dataset_processor.processors.translation_processor import TranslationProcessor
         
         # Create mock translation processor
         mock_processor = Mock(spec=TranslationProcessor)
@@ -338,8 +338,8 @@ class TestFlaskAppIntegration:
     def mock_translation_service(self, temp_dir):
         """Create a mock translation service for testing."""
         from unittest.mock import Mock
-        from src.medical_dataset_processor.web.translation_service import WebTranslationService
-        from src.medical_dataset_processor.processors.translation_processor import TranslationProcessor
+        from medical_dataset_processor.web.translation_service import WebTranslationService
+        from medical_dataset_processor.processors.translation_processor import TranslationProcessor
         
         session_manager = SessionManager(storage_dir=temp_dir)
         

@@ -69,7 +69,7 @@ ollama list
 medical-dataset-processor ollama --check
 
 # Tester avec un exemple simple
-python test_ollama_integration.py
+python tests/test_ollama_integration.py
 ```
 
 ## Utilisation

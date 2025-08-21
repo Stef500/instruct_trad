@@ -84,7 +84,7 @@ These directories will be created automatically and persist between container re
 Run the included test script to verify your Docker configuration:
 
 ```bash
-python test_docker.py
+python tests/test_docker.py
 ```
 
 This will test:

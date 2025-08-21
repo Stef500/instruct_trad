@@ -150,15 +150,24 @@ class FlaskTranslationApp:
             """Get the current translation item."""
             session_id = session.get('translation_session_id')
             if not session_id:
-                return jsonify({'error': 'No active session'}), 404
+                return jsonify({
+                    'error': 'No active session',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             
             translation_session = self.session_manager.load_session(session_id)
             if not translation_session:
-                return jsonify({'error': 'Session not found'}), 404
+                return jsonify({
+                    'error': 'Session not found',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             
             current_item = translation_session.get_current_item()
             if not current_item:
-                return jsonify({'error': 'No current item'}), 404
+                return jsonify({
+                    'error': 'No current item',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             
             return jsonify({
                 'item': current_item.to_dict(),
@@ -204,11 +213,17 @@ class FlaskTranslationApp:
             """Navigate to previous or next item."""
             session_id = session.get('translation_session_id')
             if not session_id:
-                return jsonify({'error': 'No active session'}), 404
+                return jsonify({
+                    'error': 'No active session',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             
             translation_session = self.session_manager.load_session(session_id)
             if not translation_session:
-                return jsonify({'error': 'Session not found'}), 404
+                return jsonify({
+                    'error': 'Session not found',
+                    'timestamp': datetime.now().isoformat()
+                }), 404
             
             success = False
             if direction == 'next':
@@ -216,7 +231,10 @@ class FlaskTranslationApp:
             elif direction == 'previous':
                 success = translation_session.navigate_previous()
             else:
-                return jsonify({'error': 'Invalid direction'}), 400
+                return jsonify({
+                    'error': 'Invalid direction',
+                    'timestamp': datetime.now().isoformat()
+                }), 400
             
             if success:
                 self.session_manager.save_session(translation_session)
@@ -227,7 +245,10 @@ class FlaskTranslationApp:
                     'progress': translation_session.get_progress_info()
                 })
             else:
-                return jsonify({'error': 'Navigation failed'}), 400
+                return jsonify({
+                    'error': 'Navigation failed',
+                    'timestamp': datetime.now().isoformat()
+                }), 400
         
         @app.route('/api/session/create', methods=['POST'])
         def create_session():

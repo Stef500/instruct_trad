@@ -8,10 +8,10 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, mock_open
 
-from src.medical_dataset_processor.models.core import (
+from medical_dataset_processor.models.core import (
     Sample, ProcessedSample, ConsolidatedDataset, ProcessingType
 )
-from src.medical_dataset_processor.exporters.jsonl_exporter import JSONLExporter
+from medical_dataset_processor.exporters.jsonl_exporter import JSONLExporter
 
 
 class TestJSONLExporter:
@@ -136,7 +136,7 @@ class TestJSONLExporter:
     
     def test_convert_sample_to_jsonl(self):
         """Test conversion of ProcessedSample to JSONL format."""
-        with patch('src.medical_dataset_processor.exporters.jsonl_exporter.datetime') as mock_datetime:
+        with patch('medical_dataset_processor.exporters.jsonl_exporter.datetime') as mock_datetime:
             mock_datetime.now.return_value.isoformat.return_value = "2024-01-01T12:00:00"
             
             jsonl_data = self.exporter._convert_sample_to_jsonl(self.processed_sample1)
@@ -160,7 +160,7 @@ class TestJSONLExporter:
     
     def test_create_metadata_line(self):
         """Test creation of dataset metadata line."""
-        with patch('src.medical_dataset_processor.exporters.jsonl_exporter.datetime') as mock_datetime:
+        with patch('medical_dataset_processor.exporters.jsonl_exporter.datetime') as mock_datetime:
             mock_datetime.now.return_value.isoformat.return_value = "2024-01-01T12:00:00"
             
             self.exporter.exported_count = 2

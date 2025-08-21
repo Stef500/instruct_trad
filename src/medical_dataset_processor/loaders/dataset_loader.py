@@ -132,12 +132,13 @@ class DatasetLoader:
             if config.config:
                 load_args.append(config.config)
             
-            # Add subset if specified (for datasets like MMLU)
+            # Add subset if specified
             if config.subset:
                 load_args.append(config.subset)
-                # MMLU uses test split by default
-                if "mmlu" in config.source_path.lower():
-                    load_kwargs["split"] = "test"
+            
+            # MMLU uses test split by default (regardless of subset)
+            if "mmlu" in config.source_path.lower():
+                load_kwargs["split"] = "test"
             
             # Load the dataset
             dataset = load_dataset(*load_args, **load_kwargs)

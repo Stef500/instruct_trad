@@ -7,6 +7,29 @@ import time
 import requests
 import sys
 import os
+import shutil
+def require_docker_or_fail():
+    """Ensure docker CLI and daemon are available, else fail with clear message."""
+    if shutil.which("docker") is None:
+        raise AssertionError(
+            "Docker CLI introuvable dans le PATH. Installe Docker Desktop et réessaie."
+        )
+    # Vérifie l'accès au démon
+    info = run_command("docker info")
+    if info is None:
+        raise AssertionError("La commande 'docker info' a expiré (timeout)")
+    if info.returncode != 0:
+        raise AssertionError(
+            "Docker daemon inaccessible. Assure-toi que Docker Desktop est démarré.\n"
+            f"Sortie: {info.stdout}\nErreurs: {info.stderr}"
+        )
+
+def _docker_compose_config_command() -> str:
+    """Return the available docker compose config command (plugin or legacy)."""
+    if shutil.which("docker-compose") is not None:
+        return "docker-compose config"
+    # Fallback to docker compose (plugin)
+    return "docker compose config"
 
 
 def run_command(command, capture_output=True):
@@ -28,33 +51,32 @@ def run_command(command, capture_output=True):
 def test_docker_build():
     """Test Docker image build."""
     print("Testing Docker image build...")
+    require_docker_or_fail()
     
     result = run_command("docker build -t medical-dataset-processor-test .")
     
-    if result and result.returncode == 0:
-        print("✅ Docker image built successfully")
-        return True
-    else:
-        print("❌ Docker image build failed")
-        if result:
-            print(f"Error: {result.stderr}")
-        return False
+    assert result is not None, "docker build command timed out"
+    assert result.returncode == 0, (
+        "Docker image build failed.\n"
+        f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+    )
+    print("✅ Docker image built successfully")
 
 
 def test_docker_compose_config():
     """Test docker-compose configuration."""
     print("Testing docker-compose configuration...")
+    require_docker_or_fail()
     
-    result = run_command("docker-compose config")
+    cmd = _docker_compose_config_command()
+    result = run_command(cmd)
     
-    if result and result.returncode == 0:
-        print("✅ docker-compose.yml configuration is valid")
-        return True
-    else:
-        print("❌ docker-compose.yml configuration is invalid")
-        if result:
-            print(f"Error: {result.stderr}")
-        return False
+    assert result is not None, f"{cmd} command timed out"
+    assert result.returncode == 0, (
+        "docker-compose.yml configuration is invalid.\n"
+        f"Command: {cmd}\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+    )
+    print("✅ docker-compose.yml configuration is valid")
 
 
 def test_environment_variables():
@@ -78,21 +100,17 @@ def test_environment_variables():
             if var not in env_content:
                 missing_vars.append(var)
         
-        if not missing_vars:
-            print("✅ All required environment variables are documented in .env.example")
-            return True
-        else:
-            print(f"❌ Missing environment variables in .env.example: {missing_vars}")
-            return False
+        assert not missing_vars, f"Missing environment variables in .env.example: {missing_vars}"
+        print("✅ All required environment variables are documented in .env.example")
             
     except FileNotFoundError:
-        print("❌ .env.example file not found")
-        return False
+        raise AssertionError(".env.example file not found")
 
 
 def test_docker_run_dry():
     """Test Docker container startup (dry run without actual API keys)."""
     print("Testing Docker container startup (dry run)...")
+    require_docker_or_fail()
     
     # Create a temporary .env file for testing
     test_env_content = """
@@ -111,7 +129,7 @@ WEB_PORT=5000
         # Try to start the container with test environment using test Flask app
         print("Starting container with test environment...")
         result = run_command(
-            "docker run --rm -d --name medical-dataset-test --env-file .env.test -p 5001:5000 medical-dataset-processor-test python test_flask_startup.py",
+            "docker run --rm -d --name medical-dataset-test --env-file .env.test -p 5001:5000 medical-dataset-processor-test python /app/test_flask_startup.py",
             capture_output=True
         )
         
@@ -144,7 +162,7 @@ WEB_PORT=5000
                 run_command(f"docker stop {container_id}")
                 print("Container stopped")
                 
-                return health_success
+                assert health_success, "Health endpoint not accessible"
             else:
                 print("❌ Container stopped unexpectedly")
                 # Get container logs
@@ -153,12 +171,12 @@ WEB_PORT=5000
                     print("Container logs:")
                     print(logs_result.stdout)
                     print(logs_result.stderr)
-                return False
+                raise AssertionError("Container stopped unexpectedly")
         else:
             print("❌ Failed to start container")
             if result:
                 print(f"Error: {result.stderr}")
-            return False
+            raise AssertionError("Failed to start container")
             
     finally:
         # Clean up test environment file

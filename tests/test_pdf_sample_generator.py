@@ -8,10 +8,10 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.medical_dataset_processor.models.core import (
+from medical_dataset_processor.models.core import (
     Sample, ProcessedSample, ConsolidatedDataset, ProcessingType
 )
-from src.medical_dataset_processor.exporters.pdf_sample_generator import PDFSampleGenerator
+from medical_dataset_processor.exporters.pdf_sample_generator import PDFSampleGenerator
 
 
 class TestPDFSampleGenerator:
@@ -315,7 +315,7 @@ class TestPDFSampleGenerator:
             assert os.path.exists(output_path2)
             assert os.path.getsize(output_path1) == os.path.getsize(output_path2)
     
-    @patch('src.medical_dataset_processor.exporters.pdf_sample_generator.SimpleDocTemplate')
+    @patch('medical_dataset_processor.exporters.pdf_sample_generator.SimpleDocTemplate')
     def test_create_pdf_io_error(self, mock_doc, pdf_generator, sample_data):
         """Test error handling when PDF creation fails."""
         # Mock the document to raise an exception during build

@@ -6,8 +6,8 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 import openai
 
-from src.medical_dataset_processor.models.core import Sample, GeneratedSample, ProcessedSample, ProcessingType
-from src.medical_dataset_processor.processors.generation_processor import (
+from medical_dataset_processor.models.core import Sample, GeneratedSample, ProcessedSample, ProcessingType
+from medical_dataset_processor.processors.generation_processor import (
     GenerationProcessor,
     GenerationConfig,
     GenerationError
@@ -21,10 +21,11 @@ def sample_config():
         api_key="test-api-key",
         model="gpt-4o-mini",
         max_retries=2,
-        base_delay=0.1,
+        base_delay=0.5,
         prompt_length=100,
         max_tokens=200,
-        temperature=0.7
+        temperature=0.7,
+        enable_streaming=False  # Disable streaming for tests
     )
 
 
@@ -157,14 +158,11 @@ class TestGenerationProcessorIntegration:
         mock_openai_class.return_value = mock_client
         
         # Mock test connection, success, failure, success
-        mock_response = Mock()
-        mock_response.status_code = 429
         mock_client.chat.completions.create.side_effect = [
             Mock(),  # Test connection
             self._create_mock_response("First sample generated successfully."),
-            openai.RateLimitError("Rate limit", response=mock_response, body={"error": "Rate limit"}),  # All retries fail
-            openai.RateLimitError("Rate limit", response=mock_response, body={"error": "Rate limit"}),
-            openai.RateLimitError("Rate limit", response=mock_response, body={"error": "Rate limit"}),
+            Exception("Rate limit exceeded"),  # Second sample fails on attempt 1
+            Exception("Rate limit exceeded"),  # Second sample fails on attempt 2 (max_retries=2)
             self._create_mock_response("Third sample generated successfully.")
         ]
         
@@ -173,8 +171,8 @@ class TestGenerationProcessorIntegration:
         
         # Should have 2 successful results (first and third samples)
         assert len(results) == 2
-        assert results[0].sample == medical_samples[0]
-        assert results[1].sample == medical_samples[2]
+        ids = [r.sample.id for r in results]
+        assert ids == [medical_samples[0].id, medical_samples[2].id]
     
     @patch('openai.OpenAI')
     def test_metadata_completeness(self, mock_openai_class, sample_config, medical_samples):
@@ -188,6 +186,7 @@ class TestGenerationProcessorIntegration:
         processor = GenerationProcessor(sample_config)
         results = processor.generate_from_prompts([medical_samples[0]])
         
+        assert len(results) == 1
         result = results[0]
         metadata = result.generation_metadata
         

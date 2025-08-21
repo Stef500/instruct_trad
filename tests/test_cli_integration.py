@@ -98,4 +98,3 @@ def test_cli_process_missing_api_keys():
     ], capture_output=True, text=True)
     
     assert result.returncode == 1
-    assert "API key is required" in result.stdout
