@@ -93,6 +93,51 @@ class TranslationProcessor:
             self.logger.warning(f"Failed samples: {[s.id for s, _ in failed_samples]}")
         
         return translated_samples
+
+    def translate_text(self, text: str, target_language: Optional[str] = None) -> str:
+        """
+        Translate an arbitrary text string using DeepL.
+
+        Args:
+            text: Raw text to translate
+            target_language: Optional override for target language
+
+        Returns:
+            Translated text string
+        """
+        if not text:
+            return ""
+
+        lang = (target_language or self.config.target_language).upper()
+
+        last_exception = None
+
+        for attempt in range(self.config.max_retries):
+            try:
+                result = self.translator.translate_text(text, target_lang=lang)
+                return result.text
+            except deepl.TooManyRequestsException as e:
+                last_exception = RateLimitError(f"Rate limit exceeded: {str(e)}")
+                if attempt < self.config.max_retries - 1:
+                    delay = self._calculate_backoff_delay(attempt)
+                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    time.sleep(delay)
+            except deepl.DeepLException as e:
+                last_exception = TranslationError(f"DeepL API error: {str(e)}")
+                if attempt < self.config.max_retries - 1:
+                    delay = self._calculate_backoff_delay(attempt)
+                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    time.sleep(delay)
+            except Exception as e:
+                last_exception = TranslationError(f"Unexpected error: {str(e)}")
+                if attempt < self.config.max_retries - 1:
+                    delay = self._calculate_backoff_delay(attempt)
+                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    time.sleep(delay)
+
+        if last_exception:
+            raise last_exception
+        raise TranslationError(f"Translation failed after {self.config.max_retries} attempts")
     
     def _translate_single_sample(self, sample: Sample) -> TranslatedSample:
         """

@@ -43,6 +43,8 @@ class PipelineConfig:
     translation_count: int = 50
     generation_count: int = 50
     target_language: str = "FR"
+    # Post-processing
+    post_translate_generation: bool = True
     
     # Output configuration
     output_dir: str = "output"
@@ -355,6 +357,9 @@ class MedicalDatasetProcessor:
             # Process generations with Ollama
             try:
                 generated_samples = self.ollama_processor.generate_from_prompts(samples)
+                # Optionally post-translate generated content to target language
+                if self.config.post_translate_generation and generated_samples:
+                    generated_samples = self._post_translate_generated_samples(generated_samples)
                 self.processing_stats["samples_generated"] = len(generated_samples)
                 
                 self.logger.info(f"Successfully generated content for {len(generated_samples)} samples using Ollama")
@@ -383,6 +388,9 @@ class MedicalDatasetProcessor:
             # Process generations with interruption handling
             try:
                 generated_samples = self.generation_processor.generate_from_prompts(samples)
+                # Optionally post-translate generated content to target language
+                if self.config.post_translate_generation and generated_samples:
+                    generated_samples = self._post_translate_generated_samples(generated_samples)
                 self.processing_stats["samples_generated"] = len(generated_samples)
                 
                 self.logger.info(f"Successfully generated content for {len(generated_samples)} samples using OpenAI")
@@ -405,6 +413,79 @@ class MedicalDatasetProcessor:
             except Exception as e:
                 self.logger.error(f"Generation processing failed: {str(e)}")
                 raise
+
+    def _post_translate_generated_samples(self, generated_samples: List) -> List:
+        """
+        Post-translate generated samples into the target language.
+
+        For each generated sample, translate the concatenation of the prompt and the generated
+        text, so the final content is entirely in the target language.
+
+        Args:
+            generated_samples: List of GeneratedSample
+
+        Returns:
+            List of GeneratedSample with translated generated_text
+        """
+        if not generated_samples:
+            return generated_samples
+
+        target_lang = (self.config.target_language or "FR").upper()
+
+        # Ensure translators are initialized depending on configuration
+        use_ollama_translation = self.config.use_ollama or self.config.use_ollama_for_translation
+
+        if use_ollama_translation:
+            if self.ollama_processor is None:
+                ollama_config = OllamaConfig(
+                    model_name=self.config.ollama_model_name,
+                    base_url=self.config.ollama_base_url,
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size
+                )
+                self.ollama_processor = OllamaProcessor(ollama_config)
+        else:
+            # Prepare DeepL translator if not already available
+            if self.translation_processor is None:
+                if not self.config.deepl_api_key:
+                    raise ValueError("DeepL API key is required for post-translation when not using Ollama")
+                translation_config = TranslationConfig(
+                    api_key=self.config.deepl_api_key,
+                    target_language=target_lang,
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size
+                )
+                self.translation_processor = TranslationProcessor(translation_config)
+
+        translated_generated_samples = []
+
+        for gen in generated_samples:
+            try:
+                combined_text = f"{gen.prompt}\n\n{gen.generated_text}".strip()
+
+                if use_ollama_translation:
+                    translated_text = self.ollama_processor.translate_text(combined_text)
+                    method = "ollama"
+                else:
+                    translated_text = self.translation_processor.translate_text(combined_text)
+                    method = "deepl"
+
+                # Enrich metadata and replace generated_text with translated content
+                gen.generation_metadata = {
+                    **gen.generation_metadata,
+                    "post_translated": True,
+                    "post_translation_language": target_lang,
+                    "post_translation_method": method,
+                    "original_generated_text": gen.generated_text
+                }
+                gen.generated_text = translated_text
+
+                translated_generated_samples.append(gen)
+            except Exception as e:
+                self.logger.error(f"Post-translation failed for sample {gen.sample.id}: {str(e)}")
+                translated_generated_samples.append(gen)
+
+        return translated_generated_samples
     
     def _consolidate_results(self, translated_samples: List, generated_samples: List) -> ConsolidatedDataset:
         """

@@ -133,6 +133,18 @@ class OllamaProcessor:
             self.logger.warning(f"Failed samples: {[s.id for s, _ in failed_samples]}")
         
         return translated_samples
+
+    def translate_text(self, text: str) -> str:
+        """
+        Translate arbitrary text to French using the CroissantLM translation prompt.
+
+        Chooses chunked translation for long inputs.
+        """
+        if not text:
+            return ""
+        if len(text) > 500:
+            return self._translate_long_text(text)
+        return self._translate_text_direct(text)
     
     def generate_from_prompts(self, samples: List[Sample]) -> List[GeneratedSample]:
         """
