@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 import click
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from rich.table import Table
@@ -25,6 +26,9 @@ from .utils.logging import setup_logging
 from .web.app import create_app
 from .web.models import ProcessingMode
 
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize rich console
 console = Console()
@@ -494,12 +498,12 @@ def show_stats(stats_file: str):
 )
 @click.option(
     "--host",
-    default="0.0.0.0",
+    default=os.environ.get('WEB_HOST', '0.0.0.0'),
     help="Host address for web interface"
 )
 @click.option(
     "--port", "-p",
-    default=5000,
+    default=int(os.environ.get('WEB_PORT', '5000')),
     help="Port for web interface",
     type=click.IntRange(1, 65535)
 )
@@ -523,6 +527,9 @@ def web(
     debug: bool
 ):
     """Launch web interface for interactive translation."""
+    
+    # Load environment variables from .env file (already loaded for default values)
+    load_dotenv()
     
     console.print(Panel.fit(
         "[bold blue]Medical Dataset Processor - Web Interface[/bold blue]\n"
@@ -552,6 +559,9 @@ def web(
         return
     
     # For web modes, validate DeepL API key
+    if not deepl_key:
+        deepl_key = os.environ.get('DEEPL_API_KEY')
+    
     if not deepl_key:
         console.print("[red]Error:[/red] DeepL API key is required for web interface modes")
         console.print("Use --deepl-key option or set DEEPL_API_KEY environment variable")
