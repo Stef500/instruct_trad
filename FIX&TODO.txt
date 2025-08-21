@@ -1,0 +1,32 @@
+NON WEB:
+
+Pb : 
+
+- barre reste bloquée à 20%
+- génération se fait en anglais !!
+- trad = 
+	* n'impoorte quoi = validation traduction +++++
+	* Voici le texte traduit en français :
+	* utiliser croissantLM que pour la traduction et non la génération +++
+- utlisation croissantLM: marche avec interface web ?
+- mettre tous les fichiers tests dans le repetoire test = OK
+- refaire toutes la doc dont celle des tests
+
+
+WEB:
+
+Pb Trad:
+
+- quand finit de valider, plus rien ne se passe.
+- affiche logo de sauvegarde pour chaque lettre (augmenter la frequence)
+- barre progression affiche pas complètement l'avancée
+
+Quesions : 
+
+- qu'est ce qui se passe une fois la traduction validée ? => data/sesssion/json...
+
+Ajout:
+
+- ajout titre page 
+- mode nuit
+- utiliser croissantLM (avec ollama/studioLM) plutot qu'openAI (ou option)
