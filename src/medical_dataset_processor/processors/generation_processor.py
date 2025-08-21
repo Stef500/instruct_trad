@@ -3,6 +3,7 @@ Generation processor using OpenAI GPT-4o-mini API with error handling and rate l
 """
 import time
 import logging
+import signal
 from typing import List, Optional
 from dataclasses import dataclass
 import openai
@@ -15,13 +16,16 @@ class GenerationConfig:
     """Configuration for generation processing."""
     api_key: str
     model: str = "gpt-4o-mini"
-    max_retries: int = 3
-    base_delay: float = 1.0
-    max_delay: float = 60.0
+    max_retries: int = 2  # Réduit de 3 à 2
+    base_delay: float = 0.5
+    max_delay: float = 5.0  # Réduit de 10.0 à 5.0
     batch_size: int = 10
     prompt_length: int = 100
     max_tokens: int = 500
     temperature: float = 0.7
+    timeout: int = 30
+    request_timeout: int = 25  # Réduit de 60 à 25 secondes
+    enable_streaming: bool = True  # Nouveau: activation du streaming
 
 
 class GenerationError(Exception):
@@ -31,6 +35,11 @@ class GenerationError(Exception):
 
 class GenerationRateLimitError(GenerationError):
     """Exception raised when rate limit is exceeded."""
+    pass
+
+
+class GenerationInterruptedError(GenerationError):
+    """Exception raised when generation is interrupted by user."""
     pass
 
 
@@ -48,6 +57,11 @@ class GenerationProcessor:
         """
         self.config = config
         self.logger = logging.getLogger(__name__)
+        self._interrupted = False
+        
+        # Setup signal handlers for graceful interruption
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
         
         # Initialize OpenAI client
         try:
@@ -59,15 +73,23 @@ class GenerationProcessor:
         except Exception as e:
             raise GenerationError(f"Failed to initialize OpenAI client: {str(e)}")
     
+    def _signal_handler(self, signum, frame):
+        """Handle interruption signals gracefully."""
+        self.logger.info("Interruption signal received. Finishing current request and exiting gracefully...")
+        self._interrupted = True
+    
     def _test_connection(self):
         """Test the OpenAI API connection."""
         try:
+            self.logger.debug("Testing OpenAI API connection...")
             # Make a minimal request to test the connection
             self.client.chat.completions.create(
                 model=self.config.model,
                 messages=[{"role": "user", "content": "Test"}],
-                max_tokens=1
+                max_tokens=1,
+                timeout=self.config.request_timeout
             )
+            self.logger.debug("OpenAI API connection test successful")
         except Exception as e:
             raise GenerationError(f"Failed to connect to OpenAI API: {str(e)}")
     
@@ -83,6 +105,7 @@ class GenerationProcessor:
             
         Raises:
             GenerationError: If generation fails after all retries
+            GenerationInterruptedError: If generation is interrupted by user
         """
         if not samples:
             return []
@@ -93,11 +116,23 @@ class GenerationProcessor:
         self.logger.info(f"Starting generation for {len(samples)} samples")
         
         for i, sample in enumerate(samples):
+            # Check for interruption
+            if self._interrupted:
+                self.logger.warning(f"Generation interrupted by user. Processed {len(generated_samples)}/{len(samples)} samples")
+                # Save partial results before raising exception
+                self._last_generated_samples = generated_samples
+                raise GenerationInterruptedError("Generation interrupted by user")
+            
             try:
+                self.logger.info(f"Processing sample {i+1}/{len(samples)}: {sample.id}")
                 generated_sample = self._generate_single_sample(sample)
                 generated_samples.append(generated_sample)
                 self.logger.debug(f"Successfully generated content for sample {i+1}/{len(samples)}: {sample.id}")
                 
+            except GenerationInterruptedError:
+                # Save partial results before re-raising
+                self._last_generated_samples = generated_samples
+                raise
             except Exception as e:
                 self.logger.error(f"Failed to generate content for sample {sample.id}: {str(e)}")
                 failed_samples.append((sample, str(e)))
@@ -121,6 +156,7 @@ class GenerationProcessor:
             
         Raises:
             GenerationError: If generation fails after all retries
+            GenerationInterruptedError: If generation is interrupted by user
         """
         # Extract prompt from the sample
         prompt = self._extract_prompt(sample, self.config.prompt_length)
@@ -128,23 +164,33 @@ class GenerationProcessor:
         last_exception = None
         
         for attempt in range(self.config.max_retries):
+            # Check for interruption before each attempt
+            if self._interrupted:
+                raise GenerationInterruptedError("Generation interrupted by user")
+            
             try:
-                # Create the generation request
-                response = self.client.chat.completions.create(
-                    model=self.config.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a medical content generator. Continue the given text in a coherent and medically accurate manner."
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Continue this medical text: {prompt}"
-                        }
-                    ],
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature
-                )
+                self.logger.info(f"Sending request to OpenAI API for sample {sample.id} (attempt {attempt + 1}/{self.config.max_retries})")
+                
+                # Create the generation request with timeout and optional streaming
+                if self.config.enable_streaming:
+                    response = self._generate_with_streaming(prompt)
+                else:
+                    response = self.client.chat.completions.create(
+                        model=self.config.model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a medical content generator. Continue the given text in a coherent and medically accurate manner."
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Continue this medical text: {prompt}"
+                            }
+                        ],
+                        max_tokens=self.config.max_tokens,
+                        temperature=self.config.temperature,
+                        timeout=self.config.request_timeout
+                    )
                 
                 generated_text = response.choices[0].message.content.strip()
                 
@@ -155,12 +201,15 @@ class GenerationProcessor:
                     "max_tokens": self.config.max_tokens,
                     "temperature": self.config.temperature,
                     "attempt": attempt + 1,
+                    "streaming": self.config.enable_streaming,
                     "usage": {
                         "prompt_tokens": response.usage.prompt_tokens,
                         "completion_tokens": response.usage.completion_tokens,
                         "total_tokens": response.usage.total_tokens
                     } if response.usage else None
                 }
+                
+                self.logger.info(f"Successfully generated content for sample {sample.id} (attempt {attempt + 1})")
                 
                 return GeneratedSample(
                     sample=sample,
@@ -175,7 +224,16 @@ class GenerationProcessor:
                 
                 if attempt < self.config.max_retries - 1:
                     delay = self._calculate_backoff_delay(attempt)
-                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    self.logger.info(f"Waiting {delay:.2f}s before retry for sample {sample.id}...")
+                    time.sleep(delay)
+                
+            except openai.APITimeoutError as e:
+                self.logger.warning(f"API timeout for sample {sample.id}, attempt {attempt + 1}")
+                last_exception = GenerationError(f"API timeout: {str(e)}")
+                
+                if attempt < self.config.max_retries - 1:
+                    delay = self._calculate_backoff_delay(attempt)
+                    self.logger.info(f"Waiting {delay:.2f}s before retry for sample {sample.id}...")
                     time.sleep(delay)
                 
             except openai.AuthenticationError as e:
@@ -192,7 +250,7 @@ class GenerationProcessor:
                 
                 if attempt < self.config.max_retries - 1:
                     delay = self._calculate_backoff_delay(attempt)
-                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    self.logger.info(f"Waiting {delay:.2f}s before retry for sample {sample.id}...")
                     time.sleep(delay)
                 
             except Exception as e:
@@ -201,7 +259,7 @@ class GenerationProcessor:
                 
                 if attempt < self.config.max_retries - 1:
                     delay = self._calculate_backoff_delay(attempt)
-                    self.logger.info(f"Waiting {delay:.2f}s before retry...")
+                    self.logger.info(f"Waiting {delay:.2f}s before retry for sample {sample.id}...")
                     time.sleep(delay)
         
         # All retries exhausted
@@ -209,6 +267,65 @@ class GenerationProcessor:
             raise last_exception
         else:
             raise GenerationError(f"Generation failed after {self.config.max_retries} attempts")
+    
+    def _generate_with_streaming(self, prompt: str):
+        """
+        Generate content with streaming for immediate feedback.
+        
+        Args:
+            prompt: The prompt to generate from
+            
+        Returns:
+            OpenAI response object
+        """
+        self.logger.debug("Using streaming mode for generation...")
+        
+        response = self.client.chat.completions.create(
+            model=self.config.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a medical content generator. Continue the given text in a coherent and medically accurate manner."
+                },
+                {
+                    "role": "user",
+                    "content": f"Continue this medical text: {prompt}"
+                }
+            ],
+            max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            timeout=self.config.request_timeout,
+            stream=True
+        )
+        
+        # Collect streaming response
+        collected_chunks = []
+        collected_content = ""
+        
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                collected_content += content
+                collected_chunks.append(chunk)
+        
+        # Create a mock response object that matches the non-streaming format
+        if collected_chunks and collected_content:
+            # Create a simple response object with the collected content
+            from types import SimpleNamespace
+            
+            # Create a mock choice object
+            choice = SimpleNamespace()
+            choice.message = SimpleNamespace()
+            choice.message.content = collected_content
+            
+            # Create a mock response object
+            mock_response = SimpleNamespace()
+            mock_response.choices = [choice]
+            mock_response.usage = None  # Usage not available in streaming
+            
+            return mock_response
+        else:
+            raise GenerationError("No content received from streaming response")
     
     def _extract_prompt(self, sample: Sample, prompt_length: int = 100) -> str:
         """
@@ -250,7 +367,7 @@ class GenerationProcessor:
     
     def _calculate_backoff_delay(self, attempt: int) -> float:
         """
-        Calculate exponential backoff delay.
+        Calculate exponential backoff delay with jitter.
         
         Args:
             attempt: Current attempt number (0-based)
@@ -258,8 +375,14 @@ class GenerationProcessor:
         Returns:
             Delay in seconds
         """
+        import random
+        
+        # Exponential backoff with jitter to prevent thundering herd
         delay = self.config.base_delay * (2 ** attempt)
-        return min(delay, self.config.max_delay)
+        jitter = random.uniform(0, 0.1 * delay)  # 10% jitter
+        total_delay = delay + jitter
+        
+        return min(total_delay, self.config.max_delay)
     
     def validate_model(self, model_name: str) -> bool:
         """

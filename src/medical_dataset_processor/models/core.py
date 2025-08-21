@@ -28,6 +28,10 @@ class DatasetConfig:
     source_path: str
     format: str
     text_fields: List[str]
+    config: Optional[str] = None  # Configuration name for Hugging Face datasets
+    subset: Optional[str] = None  # Subset name for datasets like MMLU
+    description: Optional[str] = None  # Description of the dataset
+    language: Optional[str] = None  # Language of the dataset
     
     def __post_init__(self):
         """Validate required fields after initialization."""

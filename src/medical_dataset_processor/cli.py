@@ -385,6 +385,29 @@ def process(
     except KeyboardInterrupt:
         progress_tracker.stop()
         console.print("\n[yellow]Processing interrupted by user[/yellow]")
+        
+        # Try to save partial results
+        try:
+            stats = processor.get_processing_stats()
+            if stats.get("samples_translated", 0) > 0 or stats.get("samples_generated", 0) > 0:
+                console.print("[yellow]Attempting to save partial results...[/yellow]")
+                
+                # Try to export partial results
+                try:
+                    # Get partial dataset if available
+                    if hasattr(processor, '_partial_dataset') and processor._partial_dataset:
+                        processor._export_results(processor._partial_dataset)
+                        console.print("[green]✓ Partial results saved successfully[/green]")
+                    else:
+                        console.print("[yellow]No partial results available to save[/yellow]")
+                except Exception as export_error:
+                    console.print(f"[red]Failed to save partial results: {export_error}[/red]")
+                
+                # Display partial statistics
+                display_processing_stats(stats)
+        except Exception as e:
+            console.print(f"[red]Could not retrieve partial statistics: {e}[/red]")
+        
         sys.exit(1)
     except Exception as e:
         progress_tracker.stop()

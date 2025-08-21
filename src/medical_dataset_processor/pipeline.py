@@ -17,6 +17,7 @@ from .exporters.jsonl_exporter import JSONLExporter
 from .exporters.pdf_sample_generator import PDFSampleGenerator
 from .models.core import ConsolidatedDataset, Sample
 from .utils.logging import ProcessingLogger
+from .processors.generation_processor import GenerationInterruptedError
 
 
 @dataclass
@@ -138,8 +139,34 @@ class MedicalDatasetProcessor:
             
             # Step 3: Process samples
             self.logger.info("Step 3: Processing samples")
-            translated_samples = self._process_translations(translation_samples)
-            generated_samples = self._process_generations(generation_samples)
+            translated_samples = []
+            generated_samples = []
+            
+            # Process translations first
+            try:
+                translated_samples = self._process_translations(translation_samples)
+                # Save partial results after translations
+                if translated_samples:
+                    partial_dataset = self._consolidate_results(translated_samples, [])
+                    self._partial_dataset = partial_dataset
+                    self.logger.info(f"Saved partial results after translation: {len(translated_samples)} samples")
+            except Exception as e:
+                self.logger.error(f"Translation processing failed: {e}")
+                # Continue with empty translated samples
+                translated_samples = []
+            
+            # Process generations
+            try:
+                generated_samples = self._process_generations(generation_samples)
+                # Update partial results with generations
+                if generated_samples:
+                    partial_dataset = self._consolidate_results(translated_samples, generated_samples)
+                    self._partial_dataset = partial_dataset
+                    self.logger.info(f"Updated partial results with generations: {len(generated_samples)} samples")
+            except Exception as e:
+                self.logger.error(f"Generation processing failed: {e}")
+                # Continue with empty generated samples
+                generated_samples = []
             
             # Step 4: Consolidate results
             self.logger.info("Step 4: Consolidating results")
@@ -158,6 +185,16 @@ class MedicalDatasetProcessor:
             self.processing_stats["end_time"] = datetime.now()
             self.processing_stats["errors"].append(str(e))
             self.logger.error(f"Pipeline failed: {e}")
+            
+            # Try to save partial results if we have any
+            if hasattr(self, '_partial_dataset') and self._partial_dataset:
+                try:
+                    self.logger.info("Attempting to save partial results...")
+                    self._export_results(self._partial_dataset)
+                    self.logger.info("Partial results saved successfully")
+                except Exception as export_error:
+                    self.logger.error(f"Failed to save partial results: {export_error}")
+            
             raise
     
     def _load_all_datasets(self) -> List[Sample]:
@@ -283,16 +320,37 @@ class MedicalDatasetProcessor:
                 api_key=self.config.openai_api_key,
                 model="gpt-4o-mini",
                 max_retries=self.config.max_retries,
-                batch_size=self.config.batch_size
+                batch_size=self.config.batch_size,
+                request_timeout=25,  # Timeout réduit
+                enable_streaming=True  # Activation du streaming
             )
             self.generation_processor = GenerationProcessor(generation_config)
         
-        # Process generations
-        generated_samples = self.generation_processor.generate_from_prompts(samples)
-        self.processing_stats["samples_generated"] = len(generated_samples)
-        
-        self.logger.info(f"Successfully generated content for {len(generated_samples)} samples")
-        return generated_samples
+        # Process generations with interruption handling
+        try:
+            generated_samples = self.generation_processor.generate_from_prompts(samples)
+            self.processing_stats["samples_generated"] = len(generated_samples)
+            
+            self.logger.info(f"Successfully generated content for {len(generated_samples)} samples")
+            return generated_samples
+            
+        except GenerationInterruptedError:
+            # Handle graceful interruption
+            self.logger.warning("Generation was interrupted by user. Saving partial results...")
+            
+            # Try to save partial results if we have any
+            if hasattr(self.generation_processor, '_last_generated_samples'):
+                partial_samples = self.generation_processor._last_generated_samples
+                self.processing_stats["samples_generated"] = len(partial_samples)
+                self.logger.info(f"Saved {len(partial_samples)} partial generation results")
+                return partial_samples
+            else:
+                self.logger.warning("No partial results available to save")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"Generation processing failed: {str(e)}")
+            raise
     
     def _consolidate_results(self, translated_samples: List, generated_samples: List) -> ConsolidatedDataset:
         """

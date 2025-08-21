@@ -61,7 +61,11 @@ class DatasetLoader:
                     source_type=dataset_config['source_type'],
                     source_path=dataset_config['source_path'],
                     format=dataset_config['format'],
-                    text_fields=dataset_config['text_fields']
+                    text_fields=dataset_config['text_fields'],
+                    config=dataset_config.get('config'),
+                    subset=dataset_config.get('subset'),
+                    description=dataset_config.get('description'),
+                    language=dataset_config.get('language')
                 )
                 configs[dataset_name] = config
                 logger.info(f"Loaded configuration for dataset: {dataset_name}")
@@ -120,19 +124,23 @@ class DatasetLoader:
     def _load_huggingface_dataset(self, config: DatasetConfig) -> Dataset:
         """Load a dataset from Hugging Face Hub."""
         try:
-            # Handle specific dataset configurations
-            if "medqa" in config.source_path.lower():
-                # MedQA dataset
-                dataset = load_dataset(config.source_path, split="train")
-            elif "pubmedqa" in config.source_path.lower():
-                # PubMedQA dataset
-                dataset = load_dataset(config.source_path, split="train")
-            elif "mmlu" in config.source_path.lower():
-                # MMLU clinical subjects
-                dataset = load_dataset(config.source_path, "clinical_knowledge", split="test")
-            else:
-                # Generic Hugging Face dataset
-                dataset = load_dataset(config.source_path, split="train")
+            # Prepare arguments for load_dataset
+            load_args = [config.source_path]
+            load_kwargs = {"split": "train"}
+            
+            # Add config name if specified
+            if config.config:
+                load_args.append(config.config)
+            
+            # Add subset if specified (for datasets like MMLU)
+            if config.subset:
+                load_args.append(config.subset)
+                # MMLU uses test split by default
+                if "mmlu" in config.source_path.lower():
+                    load_kwargs["split"] = "test"
+            
+            # Load the dataset
+            dataset = load_dataset(*load_args, **load_kwargs)
             
             return dataset
         except Exception as e:
@@ -207,16 +215,24 @@ class DatasetLoader:
             List of Sample objects
         """
         samples = []
+        skipped_count = 0
         
         for i, item in enumerate(dataset):
             # Extract text from specified fields
             text_parts = []
             for field in config.text_fields:
-                if field in item and item[field]:
-                    text_parts.append(str(item[field]))
+                if field in item and item[field] is not None:
+                    # Convert to string and check if not empty after stripping
+                    field_text = str(item[field]).strip()
+                    if field_text:
+                        text_parts.append(field_text)
             
             if not text_parts:
-                logger.warning(f"No text found in fields {config.text_fields} for item {i}")
+                skipped_count += 1
+                if skipped_count <= 10:  # Log only first 10 warnings to avoid spam
+                    logger.warning(f"No text found in fields {config.text_fields} for item {i}")
+                elif skipped_count == 11:
+                    logger.warning(f"Suppressing further warnings for empty fields. Total skipped: {skipped_count}")
                 continue
             
             original_text = " ".join(text_parts)
@@ -228,6 +244,9 @@ class DatasetLoader:
                 original_text=original_text
             )
             samples.append(sample)
+        
+        if skipped_count > 0:
+            logger.info(f"Skipped {skipped_count} items with empty text fields for dataset {config.name}")
         
         logger.info(f"Converted {len(samples)} items to samples for dataset {config.name}")
         return samples

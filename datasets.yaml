@@ -14,8 +14,9 @@ pubmedqa:
   name: "pubmedqa"
   source_type: "huggingface"
   source_path: "qiaojin/PubMedQA"
+  subset: "pqa_labeled"
   format: "json"
-  text_fields: ["question", "context", "final_decision"]
+  text_fields: ["question", "long_answer", "final_decision"]
   description: "PubMed-based question answering dataset for biomedical research"
   language: "en"
 
@@ -23,8 +24,9 @@ healthsearchqa:
   name: "healthsearchqa"
   source_type: "huggingface"
   source_path: "katielink/healthsearchqa"
+  subset: "all_data"
   format: "json"
-  text_fields: ["question", "answer"]
+  text_fields: ["question"]
   description: "Health-focused search question answering dataset"
   language: "en"
 
