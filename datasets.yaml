@@ -4,8 +4,7 @@
 medqa:
   name: "medqa"
   source_type: "huggingface"
-  source_path: "bigbio/med_qa"
-  subset: "med_qa_en_bigbio_qa"
+  source_path: "GBaker/MedQA-USMLE-4-options"
   format: "json"
   text_fields: ["question", "answer"]
   description: "Medical Question Answering dataset with clinical questions and answers"
@@ -14,8 +13,7 @@ medqa:
 pubmedqa:
   name: "pubmedqa"
   source_type: "huggingface"
-  source_path: "bigbio/pubmed_qa"
-  subset: "pubmed_qa_labeled_fold0_bigbio_qa"
+  source_path: "qiaojin/PubMedQA"
   format: "json"
   text_fields: ["question", "context", "final_decision"]
   description: "PubMed-based question answering dataset for biomedical research"
@@ -24,7 +22,7 @@ pubmedqa:
 healthsearchqa:
   name: "healthsearchqa"
   source_type: "huggingface"
-  source_path: "keivalya/HealthSearchQA"
+  source_path: "katielink/healthsearchqa"
   format: "json"
   text_fields: ["question", "answer"]
   description: "Health-focused search question answering dataset"
@@ -41,9 +39,10 @@ mmlu_clinical:
   language: "en"
 
 # Configuration globale pour le traitement
-processing_config:
-  translation_samples_per_dataset: 50
-  generation_samples_per_dataset: 50
-  target_language: "fr"
-  output_format: "jsonl"
-  pdf_sample_size: 100
+#processing_config:
+#  translation_samples_per_dataset: 50
+#  generation_samples_per_dataset: 50
+#  target_language: "fr"
+#  output_format: "jsonl"
+#  pdf_sample_size: 100
+
