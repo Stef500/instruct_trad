@@ -89,20 +89,38 @@ def setup_cli_logging(verbose: bool = False, log_file: Optional[str] = None):
         logging.getLogger().addHandler(file_handler)
 
 
-def validate_api_keys(deepl_key: Optional[str], openai_key: Optional[str], use_ollama: bool) -> bool:
+def validate_api_keys(deepl_key: Optional[str], openai_key: Optional[str], use_ollama: bool, 
+                     use_ollama_for_translation: bool = False, use_ollama_for_generation: bool = False) -> bool:
     """Validate that required API keys are available."""
     errors = []
     
+    # Determine which services are being used
+    using_ollama_translation = use_ollama or use_ollama_for_translation
+    using_ollama_generation = use_ollama or use_ollama_for_generation
+    using_deepl_translation = not using_ollama_translation
+    using_openai_generation = not using_ollama_generation
+    
+    # Display configuration summary
     if use_ollama:
-        # When using Ollama, API keys are not required
-        console.print("[green]Using Ollama - no API keys required[/green]")
-        return True
+        console.print("[green]Using Ollama for both translation and generation - no API keys required[/green]")
+    elif use_ollama_for_translation and use_ollama_for_generation:
+        console.print("[green]Using Ollama for both translation and generation - no API keys required[/green]")
+    else:
+        if using_ollama_translation:
+            console.print("[green]Using Ollama for translation[/green]")
+        if using_ollama_generation:
+            console.print("[green]Using Ollama for generation[/green]")
+        if using_deepl_translation:
+            console.print("[blue]Using DeepL for translation[/blue]")
+        if using_openai_generation:
+            console.print("[blue]Using OpenAI for generation[/blue]")
     
-    if not deepl_key:
-        errors.append("DeepL API key is required (use --deepl-key or DEEPL_API_KEY env var)")
+    # Validate required API keys
+    if using_deepl_translation and not deepl_key:
+        errors.append("DeepL API key is required for translation (use --deepl-key or DEEPL_API_KEY env var)")
     
-    if not openai_key:
-        errors.append("OpenAI API key is required (use --openai-key or OPENAI_API_KEY env var)")
+    if using_openai_generation and not openai_key:
+        errors.append("OpenAI API key is required for generation (use --openai-key or OPENAI_API_KEY env var)")
     
     if errors:
         for error in errors:
@@ -129,13 +147,25 @@ def display_config_summary(config: PipelineConfig):
     table.add_row("Max Retries", str(config.max_retries))
     table.add_row("Batch Size", str(config.batch_size))
     
-    # Add Ollama configuration if used
+    # Add processing mode configuration
     if config.use_ollama:
-        table.add_row("Processing Mode", "[green]Ollama (Local)[/green]")
+        table.add_row("Processing Mode", "[green]Ollama (Translation + Generation)[/green]")
+        table.add_row("Ollama Model", config.ollama_model_name)
+        table.add_row("Ollama URL", config.ollama_base_url)
+    elif config.use_ollama_for_translation and config.use_ollama_for_generation:
+        table.add_row("Processing Mode", "[green]Ollama (Translation + Generation)[/green]")
+        table.add_row("Ollama Model", config.ollama_model_name)
+        table.add_row("Ollama URL", config.ollama_base_url)
+    elif config.use_ollama_for_translation:
+        table.add_row("Processing Mode", "[yellow]Mixed (Ollama Translation + OpenAI Generation)[/yellow]")
+        table.add_row("Ollama Model", config.ollama_model_name)
+        table.add_row("Ollama URL", config.ollama_base_url)
+    elif config.use_ollama_for_generation:
+        table.add_row("Processing Mode", "[yellow]Mixed (DeepL Translation + Ollama Generation)[/yellow]")
         table.add_row("Ollama Model", config.ollama_model_name)
         table.add_row("Ollama URL", config.ollama_base_url)
     else:
-        table.add_row("Processing Mode", "[blue]Cloud APIs[/blue]")
+        table.add_row("Processing Mode", "[blue]Cloud APIs (DeepL + OpenAI)[/blue]")
     
     console.print(table)
 
@@ -198,7 +228,17 @@ def cli():
 @click.option(
     "--use-ollama",
     is_flag=True,
-    help="Use local Ollama with CroissantLM instead of cloud APIs"
+    help="Use local Ollama with CroissantLM for both translation and generation"
+)
+@click.option(
+    "--use-ollama-for-translation",
+    is_flag=True,
+    help="Use local Ollama with CroissantLM for translation only"
+)
+@click.option(
+    "--use-ollama-for-generation",
+    is_flag=True,
+    help="Use local Ollama with CroissantLM for generation only"
 )
 @click.option(
     "--ollama-model",
@@ -291,6 +331,8 @@ def process(
     deepl_key: Optional[str],
     openai_key: Optional[str],
     use_ollama: bool,
+    use_ollama_for_translation: bool,
+    use_ollama_for_generation: bool,
     ollama_model: str,
     ollama_url: str,
     output_dir: str,
@@ -321,7 +363,7 @@ def process(
     ))
     
     # Validate API keys
-    if not validate_api_keys(deepl_key, openai_key, use_ollama):
+    if not validate_api_keys(deepl_key, openai_key, use_ollama, use_ollama_for_translation, use_ollama_for_generation):
         sys.exit(1)
     
     # Create configuration
@@ -331,6 +373,8 @@ def process(
             deepl_api_key=deepl_key,
             openai_api_key=openai_key,
             use_ollama=use_ollama,
+            use_ollama_for_translation=use_ollama_for_translation,
+            use_ollama_for_generation=use_ollama_for_generation,
             ollama_model_name=ollama_model,
             ollama_base_url=ollama_url,
             output_dir=output_dir,

@@ -34,6 +34,8 @@ class PipelineConfig:
     
     # Ollama configuration
     use_ollama: bool = False
+    use_ollama_for_translation: bool = False
+    use_ollama_for_generation: bool = False
     ollama_model_name: str = "croissantlm"
     ollama_base_url: str = "http://localhost:11434"
     
@@ -285,8 +287,8 @@ class MedicalDatasetProcessor:
         if not samples:
             return []
         
-        # Use Ollama if configured, otherwise use DeepL
-        if self.config.use_ollama:
+        # Use Ollama for translation if configured
+        if self.config.use_ollama_for_translation or self.config.use_ollama:
             # Initialize Ollama processor if needed
             if self.ollama_processor is None:
                 ollama_config = OllamaConfig(
@@ -338,8 +340,8 @@ class MedicalDatasetProcessor:
         if not samples:
             return []
         
-        # Use Ollama if configured, otherwise use OpenAI
-        if self.config.use_ollama:
+        # Use Ollama for generation if configured
+        if self.config.use_ollama_for_generation or self.config.use_ollama:
             # Initialize Ollama processor if needed
             if self.ollama_processor is None:
                 ollama_config = OllamaConfig(
@@ -504,15 +506,19 @@ class MedicalDatasetProcessor:
             validation_results["errors"].append(f"Dataset configuration file not found: {self.config.datasets_yaml_path}")
             validation_results["valid"] = False
         
-        # Check API keys (only if not using Ollama)
-        if not self.config.use_ollama:
-            if not self.config.deepl_api_key:
-                validation_results["errors"].append("DeepL API key is required")
-                validation_results["valid"] = False
-            
-            if not self.config.openai_api_key:
-                validation_results["errors"].append("OpenAI API key is required")
-                validation_results["valid"] = False
+        # Check API keys based on configuration
+        using_ollama_translation = self.config.use_ollama or self.config.use_ollama_for_translation
+        using_ollama_generation = self.config.use_ollama or self.config.use_ollama_for_generation
+        using_deepl_translation = not using_ollama_translation
+        using_openai_generation = not using_ollama_generation
+        
+        if using_deepl_translation and not self.config.deepl_api_key:
+            validation_results["errors"].append("DeepL API key is required for translation")
+            validation_results["valid"] = False
+        
+        if using_openai_generation and not self.config.openai_api_key:
+            validation_results["errors"].append("OpenAI API key is required for generation")
+            validation_results["valid"] = False
         
         # Check output directory permissions
         try:

@@ -93,9 +93,24 @@ medical-dataset-processor ollama --instructions
 
 ### Traitement de datasets
 
-#### Traitement simple avec Ollama
+#### Traitement simple avec Ollama (traduction ET génération)
 ```bash
 medical-dataset-processor process --use-ollama
+```
+
+#### Utilisation d'Ollama uniquement pour la traduction
+```bash
+medical-dataset-processor process --use-ollama-for-translation
+```
+
+#### Utilisation d'Ollama uniquement pour la génération
+```bash
+medical-dataset-processor process --use-ollama-for-generation
+```
+
+#### Configuration mixte (Ollama pour traduction, OpenAI pour génération)
+```bash
+medical-dataset-processor process --use-ollama-for-translation --openai-api-key YOUR_KEY
 ```
 
 #### Traitement avec options personnalisées
@@ -124,7 +139,9 @@ medical-dataset-processor process \
 
 | Option | Description | Défaut |
 |--------|-------------|---------|
-| `--use-ollama` | Activer le mode Ollama | `False` |
+| `--use-ollama` | Activer le mode Ollama (traduction ET génération) | `False` |
+| `--use-ollama-for-translation` | Activer Ollama uniquement pour la traduction | `False` |
+| `--use-ollama-for-generation` | Activer Ollama uniquement pour la génération | `False` |
 | `--ollama-model` | Nom du modèle à utiliser | `croissantlm` |
 | `--ollama-url` | URL du serveur Ollama | `http://localhost:11434` |
 
@@ -140,10 +157,22 @@ export OLLAMA_MODEL=croissantlm
 ```python
 from medical_dataset_processor import PipelineConfig
 
+# Configuration complète avec Ollama
 config = PipelineConfig(
-    use_ollama=True,
+    use_ollama=True,  # Utilise Ollama pour traduction ET génération
     ollama_model_name="croissantlm",
     ollama_base_url="http://localhost:11434",
+    translation_count=50,
+    generation_count=50
+)
+
+# Configuration mixte : Ollama pour traduction, OpenAI pour génération
+config = PipelineConfig(
+    use_ollama_for_translation=True,  # Ollama uniquement pour traduction
+    use_ollama_for_generation=False,  # OpenAI pour génération
+    ollama_model_name="croissantlm",
+    ollama_base_url="http://localhost:11434",
+    openai_api_key="your-openai-key",
     translation_count=50,
     generation_count=50
 )
@@ -262,7 +291,17 @@ ollama run croissantlm "Bonjour, comment allez-vous ?"
 
 ## Cas d'usage recommandés
 
-### Utiliser Ollama quand :
+### Utiliser Ollama pour la traduction uniquement :
+- Vous voulez économiser sur les coûts de traduction DeepL
+- La qualité de traduction locale est suffisante pour votre cas d'usage
+- Vous préférez garder la génération avec OpenAI pour une meilleure qualité
+
+### Utiliser Ollama pour la génération uniquement :
+- Vous voulez économiser sur les coûts de génération OpenAI
+- Vous avez des contraintes de confidentialité pour la génération
+- La traduction DeepL est plus fiable pour votre cas d'usage
+
+### Utiliser Ollama complètement :
 - Vous traitez de petits à moyens volumes de données
 - La confidentialité est importante
 - Vous voulez contrôler les coûts

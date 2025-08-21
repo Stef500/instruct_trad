@@ -126,8 +126,14 @@ medical-dataset-processor ollama --check
 # Créer le modèle CroissantLM depuis le Modelfile
 medical-dataset-processor ollama --setup
 
-# Traitement avec Ollama (pas de clés API requises)
+# Traitement complet avec Ollama (traduction ET génération)
 medical-dataset-processor process --use-ollama
+
+# Utilisation d'Ollama uniquement pour la traduction
+medical-dataset-processor process --use-ollama-for-translation --openai-api-key YOUR_KEY
+
+# Utilisation d'Ollama uniquement pour la génération
+medical-dataset-processor process --use-ollama-for-generation --deepl-api-key YOUR_KEY
 
 # Traitement avec Ollama et options personnalisées
 medical-dataset-processor process \
@@ -152,7 +158,9 @@ medical-dataset-processor process \
 - `--resume`: Reprendre un traitement interrompu
 
 #### Options Ollama
-- `--use-ollama`: Utiliser Ollama au lieu des APIs cloud
+- `--use-ollama`: Utiliser Ollama pour la traduction ET la génération
+- `--use-ollama-for-translation`: Utiliser Ollama uniquement pour la traduction
+- `--use-ollama-for-generation`: Utiliser Ollama uniquement pour la génération
 - `--ollama-model`: Nom du modèle Ollama à utiliser (défaut: `croissantlm`)
 - `--ollama-url`: URL du serveur Ollama (défaut: `http://localhost:11434`)
 
@@ -258,6 +266,35 @@ Le PDF contient 100 échantillons aléatoires formatés pour relecture humaine a
 - Texte traduit/généré
 - Métadonnées de traitement
 - Scores de qualité
+
+## Cas d'usage et configurations
+
+### Configuration mixte (recommandée)
+
+Pour optimiser les coûts et la qualité, vous pouvez utiliser une configuration mixte :
+
+- **Ollama pour la traduction** : Économies sur les coûts DeepL, qualité suffisante pour la plupart des cas
+- **OpenAI pour la génération** : Meilleure qualité de génération de contenu
+
+```bash
+medical-dataset-processor process --use-ollama-for-translation --openai-api-key YOUR_KEY
+```
+
+### Traitement local complet
+
+Pour une confidentialité maximale et des coûts nuls :
+
+```bash
+medical-dataset-processor process --use-ollama
+```
+
+### Traitement cloud complet
+
+Pour une qualité et une fiabilité maximales :
+
+```bash
+medical-dataset-processor process --deepl-api-key YOUR_KEY --openai-api-key YOUR_KEY
+```
 
 ## Gestion d'erreurs et reprise
 

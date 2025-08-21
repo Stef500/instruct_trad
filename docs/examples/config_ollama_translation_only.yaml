@@ -1,0 +1,83 @@
+# Configuration pour utiliser Ollama uniquement pour la traduction
+# DeepL sera utilisé pour la génération
+
+medqa:
+  name: "medqa"
+  source_type: "huggingface"
+  source_path: "bigbio/med_qa"
+  subset: "med_qa_en_bigbio_qa"
+  format: "json"
+  text_fields: ["question", "answer"]
+  description: "Medical Question Answering dataset with clinical questions and answers"
+  language: "en"
+  quality_filters:
+    min_text_length: 50
+    max_text_length: 2000
+
+pubmedqa:
+  name: "pubmedqa"
+  source_type: "huggingface"
+  source_path: "bigbio/pubmed_qa"
+  subset: "pubmed_qa_labeled_fold0_bigbio_qa"
+  format: "json"
+  text_fields: ["question", "context", "final_decision"]
+  description: "PubMed-based question answering dataset for biomedical research"
+  language: "en"
+  quality_filters:
+    min_text_length: 100
+    max_text_length: 3000
+
+# Configuration du traitement
+processing_config:
+  translation_samples_per_dataset: 30
+  generation_samples_per_dataset: 30
+  target_language: "fr"
+  output_format: "jsonl"
+  pdf_sample_size: 50
+  
+  # Configuration Ollama - UNIQUEMENT pour la traduction
+  ollama:
+    # Désactiver l'utilisation générale d'Ollama
+    use_ollama: false
+    
+    # Activer Ollama UNIQUEMENT pour la traduction
+    use_ollama_for_translation: true
+    
+    # Désactiver Ollama pour la génération (utilisera OpenAI/DeepL)
+    use_ollama_for_generation: false
+    
+    # Configuration du modèle Ollama pour la traduction
+    model_name: "croissantlm"
+    base_url: "http://localhost:11434"
+    max_retries: 3
+    batch_size: 5
+    temperature: 0.0  # Déterministe pour la traduction
+    max_tokens: 1000
+  
+  # Paramètres de traduction (utilisera Ollama)
+  translation:
+    batch_size: 5  # Plus petit pour Ollama
+    max_retries: 3
+    retry_delay: 2
+    formality: "default"
+    
+  # Paramètres de génération (utilisera OpenAI)
+  generation:
+    model: "gpt-4o-mini"
+    max_tokens: 500
+    temperature: 0.7
+    prompt_length: 100
+    batch_size: 10
+    
+  # Paramètres de performance
+  performance:
+    max_concurrent_requests: 3  # Réduit pour Ollama
+    request_timeout: 60  # Plus long pour Ollama
+    enable_caching: true
+    cache_ttl: 3600
+    
+  # Paramètres de qualité
+  quality:
+    enable_validation: true
+    min_confidence_score: 0.7  # Légèrement plus permissif pour Ollama
+    enable_duplicate_detection: true

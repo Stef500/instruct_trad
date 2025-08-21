@@ -60,6 +60,25 @@ processing_config:
   output_format: "jsonl"
   pdf_sample_size: 100
   
+  # Configuration Ollama (optionnel)
+  ollama:
+    # Utilisation générale d'Ollama (déprécié, utilisez les options spécifiques ci-dessous)
+    use_ollama: false
+    
+    # Utilisation d'Ollama pour la traduction uniquement
+    use_ollama_for_translation: false
+    
+    # Utilisation d'Ollama pour la génération uniquement
+    use_ollama_for_generation: false
+    
+    # Configuration du modèle Ollama
+    model_name: "croissantlm"
+    base_url: "http://localhost:11434"
+    max_retries: 3
+    batch_size: 5
+    temperature: 0.0  # Déterministe pour la traduction
+    max_tokens: 1000
+  
   # Paramètres de traduction
   translation:
     batch_size: 10
