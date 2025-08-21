@@ -12,6 +12,7 @@ from .loaders.dataset_loader import DatasetLoader
 from .processors.sample_selector import SampleSelector
 from .processors.translation_processor import TranslationProcessor, TranslationConfig
 from .processors.generation_processor import GenerationProcessor, GenerationConfig
+from .processors.ollama_processor import OllamaProcessor, OllamaConfig
 from .processors.dataset_consolidator import DatasetConsolidator
 from .exporters.jsonl_exporter import JSONLExporter
 from .exporters.pdf_sample_generator import PDFSampleGenerator
@@ -30,6 +31,11 @@ class PipelineConfig:
     # API configurations
     deepl_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
+    
+    # Ollama configuration
+    use_ollama: bool = False
+    ollama_model_name: str = "croissantlm"
+    ollama_base_url: str = "http://localhost:11434"
     
     # Processing parameters
     translation_count: int = 50
@@ -102,6 +108,7 @@ class MedicalDatasetProcessor:
         # Initialize processors (will be created when needed)
         self.translation_processor: Optional[TranslationProcessor] = None
         self.generation_processor: Optional[GenerationProcessor] = None
+        self.ollama_processor: Optional[OllamaProcessor] = None
         
         # Processing state
         self.processing_stats = {
@@ -278,25 +285,45 @@ class MedicalDatasetProcessor:
         if not samples:
             return []
         
-        if not self.config.deepl_api_key:
-            raise ValueError("DeepL API key is required for translation processing")
-        
-        # Initialize translation processor if needed
-        if self.translation_processor is None:
-            translation_config = TranslationConfig(
-                api_key=self.config.deepl_api_key,
-                target_language=self.config.target_language,
-                max_retries=self.config.max_retries,
-                batch_size=self.config.batch_size
-            )
-            self.translation_processor = TranslationProcessor(translation_config)
-        
-        # Process translations
-        translated_samples = self.translation_processor.translate_samples(samples)
-        self.processing_stats["samples_translated"] = len(translated_samples)
-        
-        self.logger.info(f"Successfully translated {len(translated_samples)} samples")
-        return translated_samples
+        # Use Ollama if configured, otherwise use DeepL
+        if self.config.use_ollama:
+            # Initialize Ollama processor if needed
+            if self.ollama_processor is None:
+                ollama_config = OllamaConfig(
+                    model_name=self.config.ollama_model_name,
+                    base_url=self.config.ollama_base_url,
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size
+                )
+                self.ollama_processor = OllamaProcessor(ollama_config)
+            
+            # Process translations with Ollama
+            translated_samples = self.ollama_processor.translate_samples(samples)
+            self.processing_stats["samples_translated"] = len(translated_samples)
+            
+            self.logger.info(f"Successfully translated {len(translated_samples)} samples using Ollama")
+            return translated_samples
+        else:
+            # Use DeepL API
+            if not self.config.deepl_api_key:
+                raise ValueError("DeepL API key is required for translation processing when not using Ollama")
+            
+            # Initialize translation processor if needed
+            if self.translation_processor is None:
+                translation_config = TranslationConfig(
+                    api_key=self.config.deepl_api_key,
+                    target_language=self.config.target_language,
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size
+                )
+                self.translation_processor = TranslationProcessor(translation_config)
+            
+            # Process translations
+            translated_samples = self.translation_processor.translate_samples(samples)
+            self.processing_stats["samples_translated"] = len(translated_samples)
+            
+            self.logger.info(f"Successfully translated {len(translated_samples)} samples using DeepL")
+            return translated_samples
     
     def _process_generations(self, samples: List[Sample]) -> List:
         """
@@ -311,46 +338,71 @@ class MedicalDatasetProcessor:
         if not samples:
             return []
         
-        if not self.config.openai_api_key:
-            raise ValueError("OpenAI API key is required for generation processing")
-        
-        # Initialize generation processor if needed
-        if self.generation_processor is None:
-            generation_config = GenerationConfig(
-                api_key=self.config.openai_api_key,
-                model="gpt-4o-mini",
-                max_retries=self.config.max_retries,
-                batch_size=self.config.batch_size,
-                request_timeout=25,  # Timeout réduit
-                enable_streaming=True  # Activation du streaming
-            )
-            self.generation_processor = GenerationProcessor(generation_config)
-        
-        # Process generations with interruption handling
-        try:
-            generated_samples = self.generation_processor.generate_from_prompts(samples)
-            self.processing_stats["samples_generated"] = len(generated_samples)
+        # Use Ollama if configured, otherwise use OpenAI
+        if self.config.use_ollama:
+            # Initialize Ollama processor if needed
+            if self.ollama_processor is None:
+                ollama_config = OllamaConfig(
+                    model_name=self.config.ollama_model_name,
+                    base_url=self.config.ollama_base_url,
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size
+                )
+                self.ollama_processor = OllamaProcessor(ollama_config)
             
-            self.logger.info(f"Successfully generated content for {len(generated_samples)} samples")
-            return generated_samples
-            
-        except GenerationInterruptedError:
-            # Handle graceful interruption
-            self.logger.warning("Generation was interrupted by user. Saving partial results...")
-            
-            # Try to save partial results if we have any
-            if hasattr(self.generation_processor, '_last_generated_samples'):
-                partial_samples = self.generation_processor._last_generated_samples
-                self.processing_stats["samples_generated"] = len(partial_samples)
-                self.logger.info(f"Saved {len(partial_samples)} partial generation results")
-                return partial_samples
-            else:
-                self.logger.warning("No partial results available to save")
-                return []
+            # Process generations with Ollama
+            try:
+                generated_samples = self.ollama_processor.generate_from_prompts(samples)
+                self.processing_stats["samples_generated"] = len(generated_samples)
                 
-        except Exception as e:
-            self.logger.error(f"Generation processing failed: {str(e)}")
-            raise
+                self.logger.info(f"Successfully generated content for {len(generated_samples)} samples using Ollama")
+                return generated_samples
+                
+            except Exception as e:
+                self.logger.error(f"Generation processing failed with Ollama: {str(e)}")
+                raise
+        else:
+            # Use OpenAI API
+            if not self.config.openai_api_key:
+                raise ValueError("OpenAI API key is required for generation processing when not using Ollama")
+            
+            # Initialize generation processor if needed
+            if self.generation_processor is None:
+                generation_config = GenerationConfig(
+                    api_key=self.config.openai_api_key,
+                    model="gpt-4o-mini",
+                    max_retries=self.config.max_retries,
+                    batch_size=self.config.batch_size,
+                    request_timeout=25,  # Timeout réduit
+                    enable_streaming=True  # Activation du streaming
+                )
+                self.generation_processor = GenerationProcessor(generation_config)
+            
+            # Process generations with interruption handling
+            try:
+                generated_samples = self.generation_processor.generate_from_prompts(samples)
+                self.processing_stats["samples_generated"] = len(generated_samples)
+                
+                self.logger.info(f"Successfully generated content for {len(generated_samples)} samples using OpenAI")
+                return generated_samples
+                
+            except GenerationInterruptedError:
+                # Handle graceful interruption
+                self.logger.warning("Generation was interrupted by user. Saving partial results...")
+                
+                # Try to save partial results if we have any
+                if hasattr(self.generation_processor, '_last_generated_samples'):
+                    partial_samples = self.generation_processor._last_generated_samples
+                    self.processing_stats["samples_generated"] = len(partial_samples)
+                    self.logger.info(f"Saved {len(partial_samples)} partial generation results")
+                    return partial_samples
+                else:
+                    self.logger.warning("No partial results available to save")
+                    return []
+                    
+            except Exception as e:
+                self.logger.error(f"Generation processing failed: {str(e)}")
+                raise
     
     def _consolidate_results(self, translated_samples: List, generated_samples: List) -> ConsolidatedDataset:
         """

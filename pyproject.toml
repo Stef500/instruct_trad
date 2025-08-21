@@ -13,7 +13,8 @@ dependencies = [
     "click",
     "rich",
     "flask>=2.3.0",
-    "flask-cors>=4.0.0"
+    "flask-cors>=4.0.0",
+    "requests>=2.25.0"
 ]
 
 [project.scripts]

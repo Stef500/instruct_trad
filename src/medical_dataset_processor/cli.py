@@ -89,9 +89,14 @@ def setup_cli_logging(verbose: bool = False, log_file: Optional[str] = None):
         logging.getLogger().addHandler(file_handler)
 
 
-def validate_api_keys(deepl_key: Optional[str], openai_key: Optional[str]) -> bool:
+def validate_api_keys(deepl_key: Optional[str], openai_key: Optional[str], use_ollama: bool) -> bool:
     """Validate that required API keys are available."""
     errors = []
+    
+    if use_ollama:
+        # When using Ollama, API keys are not required
+        console.print("[green]Using Ollama - no API keys required[/green]")
+        return True
     
     if not deepl_key:
         errors.append("DeepL API key is required (use --deepl-key or DEEPL_API_KEY env var)")
@@ -123,6 +128,14 @@ def display_config_summary(config: PipelineConfig):
     table.add_row("PDF Sample Size", str(config.pdf_sample_size))
     table.add_row("Max Retries", str(config.max_retries))
     table.add_row("Batch Size", str(config.batch_size))
+    
+    # Add Ollama configuration if used
+    if config.use_ollama:
+        table.add_row("Processing Mode", "[green]Ollama (Local)[/green]")
+        table.add_row("Ollama Model", config.ollama_model_name)
+        table.add_row("Ollama URL", config.ollama_base_url)
+    else:
+        table.add_row("Processing Mode", "[blue]Cloud APIs[/blue]")
     
     console.print(table)
 
@@ -181,6 +194,21 @@ def cli():
     "--openai-key",
     envvar="OPENAI_API_KEY",
     help="OpenAI API key for generation (or set OPENAI_API_KEY env var)"
+)
+@click.option(
+    "--use-ollama",
+    is_flag=True,
+    help="Use local Ollama with CroissantLM instead of cloud APIs"
+)
+@click.option(
+    "--ollama-model",
+    default="croissantlm",
+    help="Ollama model name to use (default: croissantlm)"
+)
+@click.option(
+    "--ollama-url",
+    default="http://localhost:11434",
+    help="Ollama server URL (default: http://localhost:11434)"
 )
 @click.option(
     "--output-dir", "-o",
@@ -262,6 +290,9 @@ def process(
     datasets_config: str,
     deepl_key: Optional[str],
     openai_key: Optional[str],
+    use_ollama: bool,
+    ollama_model: str,
+    ollama_url: str,
     output_dir: str,
     translation_count: int,
     generation_count: int,
@@ -290,7 +321,7 @@ def process(
     ))
     
     # Validate API keys
-    if not validate_api_keys(deepl_key, openai_key):
+    if not validate_api_keys(deepl_key, openai_key, use_ollama):
         sys.exit(1)
     
     # Create configuration
@@ -299,6 +330,9 @@ def process(
             datasets_yaml_path=datasets_config,
             deepl_api_key=deepl_key,
             openai_api_key=openai_key,
+            use_ollama=use_ollama,
+            ollama_model_name=ollama_model,
+            ollama_base_url=ollama_url,
             output_dir=output_dir,
             translation_count=translation_count,
             generation_count=generation_count,
@@ -638,6 +672,74 @@ def web(
 def version():
     """Show version information."""
     console.print("[blue]Medical Dataset Processor v0.1.0[/blue]")
+
+
+@cli.command()
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check Ollama setup"
+)
+@click.option(
+    "--setup",
+    is_flag=True,
+    help="Setup CroissantLM model"
+)
+@click.option(
+    "--instructions",
+    is_flag=True,
+    help="Show setup instructions"
+)
+@click.option(
+    "--url",
+    default="http://localhost:11434",
+    help="Ollama server URL"
+)
+def ollama(check: bool, setup: bool, instructions: bool, url: str):
+    """Manage Ollama setup for local processing."""
+    from .utils.ollama_setup import (
+        verify_ollama_setup,
+        setup_croissantlm_model,
+        print_setup_instructions
+    )
+    
+    if instructions:
+        print_setup_instructions()
+        return
+    
+    if check:
+        console.print("Checking Ollama setup...")
+        results = verify_ollama_setup(url)
+        
+        console.print(f"✓ Ollama installed: {results['ollama_installed']}")
+        console.print(f"✓ Server running: {results['server_running']}")
+        console.print(f"✓ CroissantLM available: {results['croissantlm_available']}")
+        
+        if results["errors"]:
+            console.print("\n[red]Errors:[/red]")
+            for error in results["errors"]:
+                console.print(f"  • {error}")
+        
+        if results["warnings"]:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in results["warnings"]:
+                console.print(f"  • {warning}")
+        
+        if not results["errors"] and results["croissantlm_available"]:
+            console.print("\n[green]✓ Ollama setup is ready![/green]")
+        else:
+            console.print("\n[red]✗ Ollama setup needs attention.[/red]")
+            print_setup_instructions()
+    
+    if setup:
+        console.print("Setting up CroissantLM model...")
+        success, message = setup_croissantlm_model(url)
+        
+        if success:
+            console.print(f"[green]✓ {message}[/green]")
+        else:
+            console.print(f"[red]✗ {message}[/red]")
+            print_setup_instructions()
 
 
 def main():

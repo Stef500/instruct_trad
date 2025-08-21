@@ -1,6 +1,6 @@
 # Medical Dataset Processor
 
-Un système automatisé pour le traitement de datasets médicaux combinant traduction automatique via DeepL et génération de contenu via OpenAI GPT-4o-mini.
+Un système automatisé pour le traitement de datasets médicaux combinant traduction automatique via DeepL et génération de contenu via OpenAI GPT-4o-mini, avec support optionnel d'Ollama pour le traitement local.
 
 ## 📚 Documentation
 
@@ -14,10 +14,15 @@ La documentation complète se trouve dans le répertoire `docs/` :
 
 Ce package automatise le traitement de datasets médicaux en:
 - Récupérant des datasets médicaux depuis Hugging Face
-- Traduisant 50 échantillons par dataset via l'API DeepL
-- Générant du contenu pour 50 autres échantillons via OpenAI GPT-4o-mini
+- Traduisant 50 échantillons par dataset via l'API DeepL ou Ollama (local)
+- Générant du contenu pour 50 autres échantillons via OpenAI GPT-4o-mini ou Ollama (local)
 - Consolidant les résultats au format JSONL
 - Créant un échantillon PDF pour relecture
+
+### Modes de traitement
+
+- **Cloud APIs** (par défaut): Utilise DeepL et OpenAI pour le traitement
+- **Local Ollama**: Utilise CroissantLM via Ollama pour un traitement local sans coûts API
 
 ## Datasets supportés
 
@@ -31,8 +36,9 @@ Ce package automatise le traitement de datasets médicaux en:
 ### Prérequis
 
 - Python 3.8+
-- Clé API DeepL (https://www.deepl.com/pro-api)
-- Clé API OpenAI (https://platform.openai.com/api-keys)
+- Clé API DeepL (https://www.deepl.com/pro-api) - optionnel si utilisation d'Ollama
+- Clé API OpenAI (https://platform.openai.com/api-keys) - optionnel si utilisation d'Ollama
+- Ollama (https://ollama.ai/) - requis pour le traitement local
 
 ### Installation du package
 
@@ -47,6 +53,34 @@ pip install -e .
 # Ou avec uv (recommandé)
 uv pip install -e .
 ```
+
+### Installation d'Ollama (pour le traitement local)
+
+Si vous souhaitez utiliser le traitement local avec Ollama :
+
+1. **Installer Ollama** :
+   ```bash
+   # macOS/Linux
+   curl -fsSL https://ollama.ai/install.sh | sh
+   
+   # Windows
+   # Télécharger depuis https://ollama.ai/
+   ```
+
+2. **Démarrer le serveur Ollama** :
+   ```bash
+   ollama serve
+   ```
+
+3. **Créer le modèle CroissantLM depuis le Modelfile** :
+   ```bash
+   ollama create croissantlm Modelfile
+   ```
+
+4. **Vérifier l'installation** :
+   ```bash
+   medical-dataset-processor ollama --check
+   ```
 
 ### Configuration
 
@@ -65,6 +99,8 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ### Interface en ligne de commande
 
+#### Traitement avec APIs cloud (par défaut)
+
 ```bash
 # Traitement complet avec configuration par défaut
 medical-dataset-processor
@@ -81,8 +117,30 @@ medical-dataset-processor \
   --pdf-samples 50
 ```
 
+#### Traitement local avec Ollama
+
+```bash
+# Vérifier la configuration d'Ollama
+medical-dataset-processor ollama --check
+
+# Créer le modèle CroissantLM depuis le Modelfile
+medical-dataset-processor ollama --setup
+
+# Traitement avec Ollama (pas de clés API requises)
+medical-dataset-processor process --use-ollama
+
+# Traitement avec Ollama et options personnalisées
+medical-dataset-processor process \
+  --use-ollama \
+  --ollama-model croissantlm \
+  --ollama-url http://localhost:11434 \
+  --translation-count 25 \
+  --generation-count 25
+```
+
 ### Options de la CLI
 
+#### Options générales
 - `--config`: Fichier de configuration YAML (défaut: `datasets.yaml`)
 - `--output-dir`: Répertoire de sortie (défaut: `./output`)
 - `--datasets`: Datasets à traiter (défaut: tous)
@@ -92,6 +150,16 @@ medical-dataset-processor \
 - `--pdf-samples`: Nombre d'échantillons dans le PDF (défaut: 100)
 - `--parallel`: Activer le traitement parallèle
 - `--resume`: Reprendre un traitement interrompu
+
+#### Options Ollama
+- `--use-ollama`: Utiliser Ollama au lieu des APIs cloud
+- `--ollama-model`: Nom du modèle Ollama à utiliser (défaut: `croissantlm`)
+- `--ollama-url`: URL du serveur Ollama (défaut: `http://localhost:11434`)
+
+#### Commandes Ollama
+- `ollama --check`: Vérifier la configuration d'Ollama
+- `ollama --setup`: Créer le modèle CroissantLM depuis le Modelfile
+- `ollama --instructions`: Afficher les instructions d'installation
 
 ### Utilisation programmatique
 

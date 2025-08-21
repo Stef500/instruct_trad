@@ -1,0 +1,33 @@
+# CroissantLLM – Traduction EN→FR (temp=0, Q8_0)
+# Option A (téléchargement auto via HF) :
+FROM hf.co/croissantllm/CroissantLLMChat-v0.1-GGUF:Q8_0
+
+# Option B (si vous avez déjà le fichier local) :
+# FROM ./croissantllmchat-v0.1.Q8_0.gguf
+
+# Température nulle (sortie déterministe)
+PARAMETER temperature 0
+
+# Limiter la longueur de la réponse
+PARAMETER num_predict 500
+
+# Arrêt propre sur le token de fin du template chat
+PARAMETER stop "<|im_end|>"
+
+# Template conforme au chat-template Croissant (<|im_start|> / <|im_end|>)
+# + insertion exacte de votre demande « Voici le texte : "..." »
+TEMPLATE """<|im_start|>system
+Traducteur médical anglais-français. Traduisez le texte de l'anglais vers le français.
+
+RÈGLES :
+- Traduisez tout le texte
+- Utilisez la terminologie médicale française
+- Pas d'explications supplémentaires
+
+Traduisez :
+<|im_end|>
+<|im_start|>user
+{{ .Prompt }}
+<|im_end|>
+<|im_start|>assistant
+"""
