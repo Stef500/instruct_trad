@@ -1,6 +1,7 @@
 # CroissantLLM – Traduction EN→FR (temp=0, Q8_0)
 # Option A (téléchargement auto via HF) :
-FROM hf.co/croissantllm/CroissantLLMChat-v0.1-GGUF:Q8_0
+# FROM hf.co/croissantllm/CroissantLLMChat-v0.1-GGUF:Q8_0
+FROM hf.co/Stef500/CroissantLLM_ft_translation_GGUF
 
 # Option B (si vous avez déjà le fichier local) :
 # FROM ./croissantllmchat-v0.1.Q8_0.gguf
