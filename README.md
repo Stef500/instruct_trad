@@ -35,7 +35,7 @@ Ce package automatise le traitement de datasets médicaux en:
 
 ### Prérequis
 
-- Python 3.8+
+- Python 3.12+
 - Clé API DeepL (https://www.deepl.com/pro-api) - optionnel si utilisation d'Ollama
 - Clé API OpenAI (https://platform.openai.com/api-keys) - optionnel si utilisation d'Ollama
 - Ollama (https://ollama.ai/) - requis pour le traitement local
@@ -99,41 +99,48 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ### Interface en ligne de commande
 
-#### Traitement avec APIs cloud (par défaut)
+Le CLI est organisé en sous-commandes pour différents types d'opérations :
+
+```bash
+# Voir toutes les commandes disponibles
+medical-dataset-processor --help
+
+# Voir les options d'une commande spécifique
+medical-dataset-processor process --help
+```
+
+#### Commande principale : `process`
+
+**Traitement avec APIs cloud (par défaut)**
 
 ```bash
 # Traitement complet avec configuration par défaut
-medical-dataset-processor
+medical-dataset-processor process
 
 # Spécifier des fichiers de configuration personnalisés
-medical-dataset-processor --config datasets.yaml --output-dir ./output
+medical-dataset-processor process --datasets-config datasets.yaml --output-dir ./output
 
 # Traitement avec options avancées
-medical-dataset-processor \
-  --datasets medqa,pubmedqa \
-  --translation-samples 25 \
-  --generation-samples 25 \
-  --target-language fr \
-  --pdf-samples 50
+medical-dataset-processor process \
+  --deepl-key YOUR_DEEPL_KEY \
+  --openai-key YOUR_OPENAI_KEY \
+  --translation-count 25 \
+  --generation-count 25 \
+  --target-language FR \
+  --pdf-sample-size 50
 ```
 
-#### Traitement local avec Ollama
+**Traitement local avec Ollama**
 
 ```bash
-# Vérifier la configuration d'Ollama
-medical-dataset-processor ollama --check
-
-# Créer le modèle CroissantLM depuis le Modelfile
-medical-dataset-processor ollama --setup
-
 # Traitement complet avec Ollama (traduction ET génération)
 medical-dataset-processor process --use-ollama
 
 # Utilisation d'Ollama uniquement pour la traduction
-medical-dataset-processor process --use-ollama-for-translation --openai-api-key YOUR_KEY
+medical-dataset-processor process --use-ollama-for-translation --openai-key YOUR_KEY
 
 # Utilisation d'Ollama uniquement pour la génération
-medical-dataset-processor process --use-ollama-for-generation --deepl-api-key YOUR_KEY
+medical-dataset-processor process --use-ollama-for-generation --deepl-key YOUR_KEY
 
 # Traitement avec Ollama et options personnalisées
 medical-dataset-processor process \
@@ -144,30 +151,81 @@ medical-dataset-processor process \
   --generation-count 25
 ```
 
-### Options de la CLI
+#### Gestion d'Ollama : `ollama`
 
-#### Options générales
-- `--config`: Fichier de configuration YAML (défaut: `datasets.yaml`)
-- `--output-dir`: Répertoire de sortie (défaut: `./output`)
-- `--datasets`: Datasets à traiter (défaut: tous)
-- `--translation-samples`: Nombre d'échantillons à traduire par dataset (défaut: 50)
-- `--generation-samples`: Nombre d'échantillons à générer par dataset (défaut: 50)
-- `--target-language`: Langue cible pour la traduction (défaut: fr)
-- `--pdf-samples`: Nombre d'échantillons dans le PDF (défaut: 100)
-- `--parallel`: Activer le traitement parallèle
-- `--resume`: Reprendre un traitement interrompu
+```bash
+# Vérifier la configuration d'Ollama
+medical-dataset-processor ollama --check
+
+# Créer le modèle CroissantLM depuis le Modelfile
+medical-dataset-processor ollama --setup
+
+# Afficher les instructions d'installation
+medical-dataset-processor ollama --instructions
+```
+
+#### Validation : `validate`
+
+```bash
+# Valider un fichier de configuration
+medical-dataset-processor validate --datasets-config datasets.yaml
+```
+
+#### Interface web : `web`
+
+```bash
+# Démarrer l'interface web de traduction
+medical-dataset-processor web --mode automatic --host 0.0.0.0 --port 5000
+```
+
+#### Statistiques : `show-stats`
+
+```bash
+# Afficher les statistiques d'un traitement précédent
+medical-dataset-processor show-stats output/processing_stats.json
+```
+
+#### Version : `version`
+
+```bash
+# Afficher la version
+medical-dataset-processor version
+```
+
+### Options de la commande `process`
+
+#### Options de configuration
+- `--datasets-config, -d`: Fichier de configuration YAML (défaut: `datasets.yaml`)
+- `--deepl-key`: Clé API DeepL (ou variable d'environnement DEEPL_API_KEY)
+- `--openai-key`: Clé API OpenAI (ou variable d'environnement OPENAI_API_KEY)
+- `--output-dir, -o`: Répertoire de sortie (défaut: `output`)
+- `--log-file`: Fichier de log personnalisé
+- `--verbose, -v`: Activer les logs détaillés
+
+#### Options de traitement
+- `--translation-count, -t`: Nombre d'échantillons à traduire par dataset (défaut: 50)
+- `--generation-count, -g`: Nombre d'échantillons à générer par dataset (défaut: 50)
+- `--target-language`: Langue cible pour la traduction (code DeepL, défaut: FR)
+- `--pdf-sample-size`: Nombre d'échantillons dans le PDF (défaut: 100)
+- `--batch-size`: Taille des lots pour les requêtes API (défaut: 10)
+- `--max-retries`: Nombre maximum de tentatives (défaut: 3)
+- `--random-seed`: Graine aléatoire pour la reproductibilité
 
 #### Options Ollama
 - `--use-ollama`: Utiliser Ollama pour la traduction ET la génération
 - `--use-ollama-for-translation`: Utiliser Ollama uniquement pour la traduction
 - `--use-ollama-for-generation`: Utiliser Ollama uniquement pour la génération
-- `--ollama-model`: Nom du modèle Ollama à utiliser (défaut: `croissantlm`)
+- `--ollama-model`: Nom du modèle Ollama (défaut: `croissantlm`)
 - `--ollama-url`: URL du serveur Ollama (défaut: `http://localhost:11434`)
 
-#### Commandes Ollama
-- `ollama --check`: Vérifier la configuration d'Ollama
-- `ollama --setup`: Créer le modèle CroissantLM depuis le Modelfile
-- `ollama --instructions`: Afficher les instructions d'installation
+#### Options de fichiers de sortie
+- `--jsonl-filename`: Nom du fichier JSONL de sortie (défaut: `consolidated_dataset.jsonl`)
+- `--pdf-filename`: Nom du fichier PDF de sortie (défaut: `sample_review.pdf`)
+- `--stats-file`: Sauvegarder les statistiques dans un fichier JSON
+
+#### Options spéciales
+- `--dry-run`: Valider la configuration sans traiter
+- `--version`: Afficher la version
 
 ### Utilisation programmatique
 
@@ -277,7 +335,7 @@ Pour optimiser les coûts et la qualité, vous pouvez utiliser une configuration
 - **OpenAI pour la génération** : Meilleure qualité de génération de contenu
 
 ```bash
-medical-dataset-processor process --use-ollama-for-translation --openai-api-key YOUR_KEY
+medical-dataset-processor process --use-ollama-for-translation --openai-key YOUR_KEY
 ```
 
 ### Traitement local complet
@@ -293,7 +351,7 @@ medical-dataset-processor process --use-ollama
 Pour une qualité et une fiabilité maximales :
 
 ```bash
-medical-dataset-processor process --deepl-api-key YOUR_KEY --openai-api-key YOUR_KEY
+medical-dataset-processor process --deepl-key YOUR_KEY --openai-key YOUR_KEY
 ```
 
 ## Gestion d'erreurs et reprise
@@ -307,12 +365,14 @@ Le système inclut une gestion robuste des erreurs:
 
 ### Reprendre un traitement interrompu
 
-```bash
-# Le système détecte automatiquement les traitements interrompus
-medical-dataset-processor --resume
+Le système sauvegarde automatiquement les résultats partiels. Pour consulter l'état d'un traitement précédent, vous pouvez :
 
-# Ou spécifier un fichier d'état
-medical-dataset-processor --resume --state-file ./logs/processing_state.json
+```bash
+# Consulter les logs de traitement
+tail -f logs/medical_dataset_processor.log
+
+# Afficher les statistiques d'un traitement précédent
+medical-dataset-processor show-stats output/processing_stats.json
 ```
 
 ## Logs et monitoring

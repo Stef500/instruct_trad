@@ -213,3 +213,4 @@ __marimo__/
 .vscode
 /data/sessions/
 output/
+/.claude/settings.local.json
